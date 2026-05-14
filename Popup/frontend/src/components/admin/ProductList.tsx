@@ -2,9 +2,12 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ProductOut, IceCreamMode } from "../../api/types";
 import {
   adminListProducts, adminCreateProduct, adminUpdateProduct,
-  adminUploadProductImage, adminDeleteProduct, toApiError,
+  adminUploadProductImage, adminDeleteProduct, toApiError, BASE,
 } from "../../api/client";
 import { ICE_CREAM_MODES, ICE_CREAM_MODE_LABELS } from "../../utils/eventStatus";
+
+const inputCls =
+  "w-full bg-white border-2 border-caramel-200 focus:border-caramel-500 rounded-xl px-3 py-2 text-sm text-chocolate outline-none transition-colors placeholder:text-caramel-300";
 
 export default function ProductList() {
   const [products, setProducts] = useState<ProductOut[]>([]);
@@ -33,18 +36,18 @@ export default function ProductList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="font-bold text-lg">ניהול מוצרים</h2>
+      <div className="flex justify-between items-center mb-5">
+        <h2 className="font-display font-bold text-xl text-chocolate">ניהול מוצרים</h2>
         <button
           onClick={() => { setShowCreate(true); setEditingId(null); }}
-          className="text-sm bg-pink-500 text-white px-3 py-1 rounded"
+          className="bg-chocolate text-cream px-4 py-2 rounded-xl text-sm font-semibold hover:bg-chocolate-light transition-colors shadow-button"
         >
           + מוצר חדש
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-3 text-sm">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-4 text-sm">
           {error}
         </div>
       )}
@@ -71,27 +74,38 @@ export default function ProductList() {
               onError={setError}
             />
           ) : (
-            <div key={p.id} className="bg-white border rounded-xl p-3 flex justify-between items-center text-sm">
+            <div key={p.id}
+              className="bg-white border border-caramel-100 rounded-2xl shadow-card p-3 flex justify-between items-center text-sm">
               <div className="flex items-center gap-3 min-w-0">
-                {p.image_url && (
-                  <img src={p.image_url} alt={p.name} className="w-10 h-10 object-cover rounded" />
+                {p.image_url ? (
+                  <img
+                    src={`${BASE}${p.image_url}`}
+                    alt={p.name}
+                    className="w-12 h-12 object-cover rounded-xl shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-caramel-100 flex items-center justify-center shrink-0">
+                    <span className="text-xl">🍦</span>
+                  </div>
                 )}
                 <div className="min-w-0">
-                  <span className="font-medium">{p.name}</span>
-                  <span className="text-gray-400 text-xs mr-2">{ICE_CREAM_MODE_LABELS[p.ice_cream_mode]}</span>
-                  {p.description && <span className="text-gray-500 text-xs mr-2 truncate">{p.description}</span>}
+                  <span className="font-semibold text-chocolate">{p.name}</span>
+                  <span className="text-caramel-400 text-xs mr-2">{ICE_CREAM_MODE_LABELS[p.ice_cream_mode]}</span>
+                  {p.description && (
+                    <span className="text-caramel-500 text-xs mr-2 truncate block">{p.description}</span>
+                  )}
                 </div>
               </div>
-              <div className="flex gap-1 shrink-0">
+              <div className="flex gap-1.5 shrink-0">
                 <button
                   onClick={() => setEditingId(p.id)}
-                  className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  className="text-xs px-2.5 py-1 rounded-lg bg-parchment border border-caramel-200 text-chocolate hover:bg-caramel-100 transition-colors font-medium"
                 >
                   עריכה
                 </button>
                 <button
                   onClick={() => void handleDelete(p.id, p.name)}
-                  className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 hover:bg-red-100"
+                  className="text-xs px-2.5 py-1 rounded-lg bg-red-50 border border-red-100 text-red-600 hover:bg-red-100 transition-colors font-medium"
                 >
                   מחק
                 </button>
@@ -100,7 +114,10 @@ export default function ProductList() {
           )
         )}
         {products.length === 0 && !showCreate && (
-          <p className="text-gray-400 text-sm text-center py-4">אין מוצרים</p>
+          <div className="text-center py-12 text-caramel-400">
+            <p className="text-4xl mb-3">🍨</p>
+            <p className="font-medium">אין מוצרים עדיין</p>
+          </div>
         )}
       </div>
     </div>
@@ -129,20 +146,21 @@ function CreateProductForm({ onDone, onCancel, onError }: CreateProductFormProps
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-4 mb-3 text-sm space-y-2">
-      <h3 className="font-semibold">מוצר חדש</h3>
+    <form onSubmit={handleSubmit}
+      className="bg-white border border-caramel-100 rounded-2xl shadow-card p-4 mb-4 text-sm space-y-3">
+      <h3 className="font-display font-bold text-chocolate">מוצר חדש</h3>
       <input
         placeholder="שם המוצר"
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
-        className="w-full border rounded px-2 py-1"
+        className={inputCls}
       />
       <input
         placeholder="תיאור (אופציונלי)"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="w-full border rounded px-2 py-1"
+        className={inputCls}
       />
       <select
         value={mode}
@@ -150,15 +168,21 @@ function CreateProductForm({ onDone, onCancel, onError }: CreateProductFormProps
           const v = e.target.value;
           if (ICE_CREAM_MODES.includes(v as IceCreamMode)) setMode(v as IceCreamMode);
         }}
-        className="w-full border rounded px-2 py-1"
+        className={inputCls}
       >
         {ICE_CREAM_MODES.map((m) => (
           <option key={m} value={m}>{ICE_CREAM_MODE_LABELS[m]}</option>
         ))}
       </select>
       <div className="flex gap-2">
-        <button type="submit" className="bg-pink-500 text-white px-3 py-1 rounded text-sm">צור</button>
-        <button type="button" onClick={onCancel} className="border px-3 py-1 rounded text-sm">ביטול</button>
+        <button type="submit"
+          className="bg-chocolate text-cream px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-chocolate-light transition-colors">
+          צור
+        </button>
+        <button type="button" onClick={onCancel}
+          className="bg-parchment border border-caramel-200 text-chocolate px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-caramel-100 transition-colors">
+          ביטול
+        </button>
       </div>
     </form>
   );
@@ -204,18 +228,19 @@ function EditProductRow({ product, onDone, onCancel, onError }: EditProductRowPr
   };
 
   return (
-    <form onSubmit={handleSave} className="bg-white border border-pink-200 rounded-xl p-3 text-sm space-y-2">
+    <form onSubmit={handleSave}
+      className="bg-white border-2 border-caramel-200 rounded-2xl p-4 text-sm space-y-3">
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
-        className="w-full border rounded px-2 py-1"
+        className={inputCls}
       />
       <input
         placeholder="תיאור"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="w-full border rounded px-2 py-1"
+        className={inputCls}
       />
       <select
         value={mode}
@@ -223,22 +248,28 @@ function EditProductRow({ product, onDone, onCancel, onError }: EditProductRowPr
           const v = e.target.value;
           if (ICE_CREAM_MODES.includes(v as IceCreamMode)) setMode(v as IceCreamMode);
         }}
-        className="w-full border rounded px-2 py-1"
+        className={inputCls}
       >
         {ICE_CREAM_MODES.map((m) => (
           <option key={m} value={m}>{ICE_CREAM_MODE_LABELS[m]}</option>
         ))}
       </select>
-      <div className="flex gap-2 items-center">
-        <button type="submit" className="bg-pink-500 text-white px-3 py-1 rounded text-sm">שמור</button>
-        <button type="button" onClick={onCancel} className="border px-3 py-1 rounded text-sm">ביטול</button>
+      <div className="flex gap-2 items-center flex-wrap">
+        <button type="submit"
+          className="bg-chocolate text-cream px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-chocolate-light transition-colors">
+          שמור
+        </button>
+        <button type="button" onClick={onCancel}
+          className="bg-parchment border border-caramel-200 text-chocolate px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-caramel-100 transition-colors">
+          ביטול
+        </button>
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="border px-3 py-1 rounded text-sm text-gray-600 disabled:opacity-50"
+          className="bg-caramel-100 border border-caramel-200 text-caramel-600 px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-caramel-200 transition-colors disabled:opacity-50"
         >
-          {uploading ? "מעלה..." : "תמונה"}
+          {uploading ? "מעלה..." : "📷 תמונה"}
         </button>
         <input
           ref={fileRef}

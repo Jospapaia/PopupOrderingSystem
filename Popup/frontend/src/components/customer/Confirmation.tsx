@@ -5,64 +5,89 @@ interface Props {
   order: OrderOut;
   cart: CartItem[];
   slotStart: string | null;
+  onBack: () => void;
 }
 
-export default function Confirmation({ order, cart, slotStart }: Props) {
-  const total = order.items.reduce(
-    (sum, oi) => sum + oi.unit_price * oi.quantity,
-    0,
-  );
-  const shortId = order.id.slice(0, 8).toUpperCase();
-  const cartMap = new Map(cart.map((ci) => [ci.menuItem.id, ci]));
+export default function Confirmation({ order, cart, slotStart, onBack }: Props) {
+  const total    = order.items.reduce((sum, oi) => sum + oi.unit_price * oi.quantity, 0);
+  const shortId  = order.id.slice(0, 8).toUpperCase();
+  const cartMap  = new Map(cart.map((ci) => [ci.menuItem.id, ci]));
 
   return (
-    <div className="min-h-screen bg-warm-50 flex flex-col items-center justify-center p-4" dir="rtl">
-      <div className="max-w-sm w-full">
-        {/* Success icon */}
-        <div className="text-center mb-6">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-4xl">✓</span>
+    <div className="min-h-screen flex flex-col items-center justify-center p-5" dir="rtl">
+      <div className="w-full max-w-sm animate-scale-in">
+
+        {/* Success badge */}
+        <div className="text-center mb-7">
+          <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-chocolate flex items-center justify-center shadow-button-lg animate-bounce-in">
+            <span className="text-gold text-3xl font-black">✓</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-stone-800">ההזמנה אושרה!</h1>
-          <p className="text-stone-500 mt-1 text-sm">מספר הזמנה #{shortId}</p>
+          <h1 className="font-display font-black text-[2rem] text-chocolate leading-tight mb-1">
+            ההזמנה אושרה!
+          </h1>
+          <p className="text-caramel-500 text-sm tracking-widest font-medium">
+            #{shortId}
+          </p>
         </div>
 
-        {/* Receipt card */}
-        <div className="bg-white rounded-3xl shadow-card p-5 mb-5">
-          <div className="space-y-2 mb-4">
+        {/* Receipt */}
+        <div className="bg-white rounded-3xl shadow-card overflow-hidden mb-4">
+          {/* Header stripe */}
+          <div className="bg-chocolate px-5 py-3">
+            <p className="text-caramel-300 text-xs tracking-widest uppercase font-medium text-center">קבלה</p>
+          </div>
+
+          {/* Items */}
+          <div className="px-5 pt-4 pb-2 space-y-2.5">
             {order.items.map((oi) => {
               const ci = cartMap.get(oi.event_menu_item_id);
               return (
-                <div key={oi.id} className="flex justify-between items-center text-stone-700 text-sm">
-                  <span>
-                    {ci?.menuItem.product_name ?? oi.product_name ?? "פריט"}
-                    {oi.quantity > 1 && <span className="text-stone-400"> ×{oi.quantity}</span>}
-                    {oi.with_ice_cream && <span className="text-warm-500"> + גלידה</span>}
+                <div key={oi.id} className="flex justify-between items-center text-sm">
+                  <span className="text-chocolate">
+                    <span className="font-semibold">
+                      {ci?.menuItem.product_name ?? oi.product_name ?? "פריט"}
+                    </span>
+                    {oi.quantity > 1 && <span className="text-caramel-400"> ×{oi.quantity}</span>}
+                    {oi.with_ice_cream && <span className="text-caramel-500"> + גלידה</span>}
                   </span>
-                  <span className="font-semibold">₪{(oi.unit_price * oi.quantity).toFixed(0)}</span>
+                  <span className="font-bold text-chocolate mr-3 shrink-0">
+                    ₪{(oi.unit_price * oi.quantity).toFixed(0)}
+                  </span>
                 </div>
               );
             })}
           </div>
 
-          {slotStart && (
-            <div className="flex items-center gap-2 text-stone-600 text-sm py-3 border-t border-stone-100">
-              <span>🕐</span>
-              <span>איסוף בשעה <strong>{formatTime(slotStart)}</strong></span>
-            </div>
-          )}
+          <div className="mx-5 border-t border-dashed border-caramel-200 my-1" />
 
-          <div className="flex justify-between items-center pt-3 border-t border-stone-100">
-            <span className="font-bold text-stone-800">סה"כ לתשלום</span>
-            <span className="font-extrabold text-warm-600 text-xl">₪{total.toFixed(0)}</span>
+          <div className="px-5 py-3 space-y-2">
+            {slotStart && (
+              <div className="flex items-center gap-2 text-caramel-600 text-sm">
+                <span>🕐</span>
+                <span>איסוף בשעה <strong className="font-bold text-chocolate">{formatTime(slotStart)}</strong></span>
+              </div>
+            )}
+            <div className="flex justify-between items-baseline">
+              <span className="font-bold text-chocolate">סה״כ לתשלום</span>
+              <span className="font-display font-bold text-2xl text-caramel-500">₪{total.toFixed(0)}</span>
+            </div>
           </div>
         </div>
 
-        {/* Note */}
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
-          <p className="text-sm text-amber-800 font-medium">📸 שמור צילום מסך</p>
-          <p className="text-xs text-amber-700 mt-1">זוהי הרשומה היחידה של הזמנתך</p>
+        {/* Save reminder */}
+        <div className="bg-caramel-100 border border-caramel-200 rounded-2xl px-4 py-3 text-center">
+          <p className="text-sm font-bold text-chocolate">📸 שמור צילום מסך</p>
+          <p className="text-xs text-caramel-600 mt-0.5">זוהי הרשומה היחידה של הזמנתך</p>
         </div>
+
+        {/* Back to home */}
+        <button
+          onClick={onBack}
+          className="w-full text-center text-sm font-medium text-caramel-500 hover:text-chocolate transition-colors py-2"
+        >
+          חזרה לתפריט
+        </button>
+
       </div>
     </div>
   );

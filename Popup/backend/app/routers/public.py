@@ -115,6 +115,7 @@ def _get_upcoming_event_data(db: Session, today: date) -> UpcomingEventResponse:
         event=UpcomingEventOut(
             id=event.id,
             title=event.title,
+            description=event.description,
             date=event.date,
             start_time=event.start_time,
             end_time=event.end_time,
@@ -174,12 +175,23 @@ def _create_order(db: Session, payload: OrderCreate, now: datetime) -> OrderOut:
         if current_booked + new_ice_cream_qty > effective_max:
             raise HTTPException(status_code=409, detail="הסלוט מלא — אנא בחר סלוט אחר")
 
+    # Aggregate quantities per menu item (same item may appear twice for split ice-cream orders)
+    from collections import defaultdict
+    total_qty_per_item: dict[uuid.UUID, int] = defaultdict(int)
     for item_in in payload.items:
+        total_qty_per_item[item_in.event_menu_item_id] += item_in.quantity
+
+    seen_for_capacity: set[uuid.UUID] = set()
+    for item_in in payload.items:
+        emi_id = item_in.event_menu_item_id
+        if emi_id in seen_for_capacity:
+            continue
+        seen_for_capacity.add(emi_id)
         locked_emi = db.execute(
-            select(EventMenuItem).where(EventMenuItem.id == item_in.event_menu_item_id).with_for_update()
+            select(EventMenuItem).where(EventMenuItem.id == emi_id).with_for_update()
         ).scalar_one()
         bk = item_booked(db, locked_emi.id)
-        if bk + item_in.quantity > locked_emi.quantity_available:
+        if bk + total_qty_per_item[emi_id] > locked_emi.quantity_available:
             raise HTTPException(status_code=409, detail=f"הפריט {locked_emi.product.name} אזל מהמלאי")
 
     order = Order(

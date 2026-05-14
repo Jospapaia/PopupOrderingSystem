@@ -8,6 +8,9 @@ interface Props {
   eventId: string;
 }
 
+const inputCls =
+  "bg-white border-2 border-caramel-200 focus:border-caramel-500 rounded-xl px-3 py-2 text-sm text-chocolate outline-none transition-colors placeholder:text-caramel-300";
+
 export default function SlotGrid({ eventId }: Props) {
   const [slots, setSlots] = useState<SlotAdminOut[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -63,31 +66,31 @@ export default function SlotGrid({ eventId }: Props) {
   return (
     <div>
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-4 text-sm">{error}</div>
       )}
 
       {slots.length === 0 && (
-        <p className="text-gray-500 text-sm">אין סלוטים — פרסם את האירוע כדי לייצר סלוטים.</p>
+        <div className="text-center py-10 text-caramel-400">
+          <p className="text-3xl mb-2">🕐</p>
+          <p className="text-sm font-medium">אין סלוטים — פרסם את האירוע כדי לייצר סלוטים</p>
+        </div>
       )}
 
       <div className="space-y-4">
         {slots.map((slot) => (
-          <div
-            key={slot.id}
-            className={`bg-white border-2 rounded-xl p-4 ${slot.is_full ? "border-red-300" : "border-gray-200"}`}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <span className="font-semibold">{formatTime(slot.slot_start)}</span>
-                <span className="text-gray-400 mx-1">–</span>
-                <span className="text-gray-500 text-sm">{formatTime(slot.slot_end)}</span>
+          <div key={slot.id}
+            className={`bg-white rounded-2xl shadow-card p-4 border-2 ${
+              slot.is_full ? "border-red-200" : "border-caramel-100"
+            }`}>
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display font-bold text-chocolate text-lg">{formatTime(slot.slot_start)}</span>
+                <span className="text-caramel-400 text-sm">– {formatTime(slot.slot_end)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${slot.is_full ? "text-red-600" : "text-gray-700"}`}>
-                  {slot.booked_portions} מנות גלידה מתוך {slot.max_ice_cream_effective}
-                </span>
+                <CapacityDots booked={slot.booked_portions} max={slot.max_ice_cream_effective} />
                 {slot.is_full && (
-                  <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">מלא</span>
+                  <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">מלא</span>
                 )}
               </div>
             </div>
@@ -98,25 +101,32 @@ export default function SlotGrid({ eventId }: Props) {
                   type="number"
                   value={newMax}
                   onChange={(e) => setNewMax(e.target.value)}
-                  className="w-20 border rounded px-2 py-1"
+                  className={`w-20 ${inputCls}`}
                   min={slot.booked_portions}
-                  placeholder="מקסימום"
+                  placeholder="מקס׳"
                 />
-                <button onClick={() => handleUpdateSlot(slot.id)} className="bg-pink-500 text-white px-3 py-1 rounded">שמור</button>
-                <button onClick={() => setEditingSlotId(null)} className="border px-3 py-1 rounded">ביטול</button>
-                {slotEditError[slot.id] && <span className="text-red-600 text-xs">{slotEditError[slot.id]}</span>}
+                <button onClick={() => handleUpdateSlot(slot.id)}
+                  className="bg-chocolate text-cream px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-chocolate-light transition-colors">
+                  שמור
+                </button>
+                <button onClick={() => setEditingSlotId(null)}
+                  className="bg-parchment border border-caramel-200 text-chocolate px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-caramel-100 transition-colors">
+                  ביטול
+                </button>
+                {slotEditError[slot.id] && (
+                  <span className="text-red-600 text-xs">{slotEditError[slot.id]}</span>
+                )}
               </div>
             ) : (
               <button
                 onClick={() => { setEditingSlotId(slot.id); setNewMax(slot.max_ice_cream !== null ? String(slot.max_ice_cream) : ""); }}
-                className="text-xs text-blue-600 hover:underline mb-3"
-              >
+                className="text-xs font-medium text-caramel-500 hover:text-chocolate transition-colors mb-3">
                 עדכן קיבולת
               </button>
             )}
 
             {slot.orders.length > 0 && (
-              <div className="border-t pt-2 space-y-2">
+              <div className="border-t border-caramel-100 pt-3 space-y-2">
                 {slot.orders.map((order) => (
                   <OrderRow
                     key={order.id}
@@ -134,6 +144,20 @@ export default function SlotGrid({ eventId }: Props) {
   );
 }
 
+function CapacityDots({ booked, max }: { booked: number; max: number }) {
+  const dots = Array.from({ length: max }, (_, i) => i < booked);
+  return (
+    <div className="flex gap-1">
+      {dots.map((taken, i) => (
+        <div
+          key={i}
+          className={`w-4 h-4 rounded-sm ${taken ? "bg-red-400" : "bg-green-400"}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 function OrderRow({
   order,
   onPickup,
@@ -146,21 +170,27 @@ function OrderRow({
   return (
     <div className="text-sm flex justify-between items-start py-1">
       <div>
-        <span className="font-medium">{order.customer_name}</span>
-        <span className={`text-xs ml-2 px-1.5 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
+        <span className="font-semibold text-chocolate">{order.customer_name}</span>
+        <span className={`text-xs mr-2 px-1.5 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
           {ORDER_STATUS_LABELS[order.status]}
         </span>
-        <div className="text-xs text-gray-400 mt-0.5">
+        <div className="text-xs text-caramel-400 mt-0.5">
           {order.items.map((oi) =>
             `${oi.product_name}×${oi.quantity}${oi.with_ice_cream ? "+גלידה" : ""}`
           ).join(", ")}
         </div>
-        {order.notes && <div className="text-xs text-orange-600 mt-0.5">הערה: {order.notes}</div>}
+        {order.notes && <div className="text-xs text-amber-600 mt-0.5">הערה: {order.notes}</div>}
       </div>
       {order.status === "confirmed" && (
         <div className="flex gap-1">
-          <button onClick={onPickup} className="text-xs bg-blue-500 text-white px-2 py-1 rounded">אשר איסוף</button>
-          <button onClick={onCancel} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded">בטל</button>
+          <button onClick={onPickup}
+            className="text-xs bg-caramel-500 text-white px-2 py-1 rounded-lg font-medium hover:bg-caramel-600 transition-colors">
+            אשר איסוף
+          </button>
+          <button onClick={onCancel}
+            className="text-xs bg-red-50 border border-red-100 text-red-600 px-2 py-1 rounded-lg font-medium hover:bg-red-100 transition-colors">
+            בטל
+          </button>
         </div>
       )}
     </div>

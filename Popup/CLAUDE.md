@@ -15,14 +15,14 @@ backend/
     main.py           # FastAPI app, CORS, static files, logging
     auth.py           # Bearer token admin middleware
     database.py       # SQLAlchemy engine + get_db()
-    queries.py        # Shared DB helpers: booked_portions, item_booked, effective_max_ice_cream
+    queries.py        # Shared DB helpers: booked_portions, item_booked, effective_max_ice_cream, ice_cream_count_for_item
     schemas.py        # Pydantic request/response models
     models/
       models.py       # SQLAlchemy ORM models + 3 enum types
     routers/
       public.py       # GET /events/upcoming, POST /orders
       admin.py        # All /admin/* endpoints
-  alembic/            # DB migrations
+  alembic/            # DB migrations (0001 initial, 0002 add event description)
   Dockerfile
   requirements.txt
   static/uploads/     # Product images (served at /static/uploads/)
@@ -38,17 +38,21 @@ frontend/
     utils/
       format.ts       # formatTime (Asia/Jerusalem tz), formatDate, formatTimeRange
       eventStatus.ts  # STATUS_LABELS, STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS
-      cart.ts         # itemLineTotal, cartTotal
+      cart.ts         # cartItemQuantity, itemLineTotal, cartTotal, cartIceCreamPortions, needsSlotForCart
     App.tsx           # Routes: /admin → AdminApp, else → CustomerApp
     main.tsx
-    index.css
+    index.css         # Design system: chocolate/caramel/gold/cream/parchment, Secular One + Rubik fonts
   index.html          # lang="he" dir="rtl"
   vercel.json         # Vercel deployment (SPA rewrite)
+
+.claude/
+  commands/
+    qa.md             # /qa slash command — full QA pass (health, API, Playwright flows, edge cases)
 
 tests/e2e/            # Playwright tests
 playwright.config.ts
 
-docker-compose.yml    # backend + PostgreSQL
+docker-compose.yml    # backend + PostgreSQL (backend built via Dockerfile — rebuild after Python changes)
 .env.example          # Required env vars template
 README.md             # Local setup + deployment guide
 ```
@@ -70,21 +74,30 @@ README.md             # Local setup + deployment guide
 ### Ice Cream Mode (3-mode enum on `products`)
 - `none` — no machine time, no slot required (cookies, pecan pie)
 - `included` — always ice cream (standalone scoop, affogato) → slot required, counts 1× per quantity
-- `optional` — customer may add ice cream for `ice_cream_addon_price` → slot + count only if chosen
+- `optional` — customer may add ice cream per portion via a two-step UI: main stepper controls total quantity, a sub-stepper transfers portions between "with ice cream" and "without". Slot + count only for the with-ice-cream portions.
+
+### CartItem Shape (`types.ts`)
+```ts
+interface CartItem {
+  menuItem: MenuItemPublic;
+  quantityWithIceCream: number;      // portions that count against slot capacity
+  quantityWithoutIceCream: number;   // portions that don't
+}
+```
+`cartItemQuantity = quantityWithIceCream + quantityWithoutIceCream`. Price = `price * total + ice_cream_addon_price * quantityWithIceCream`. Order submission splits one CartItem into two `OrderItemIn` rows when both counts are non-zero.
 
 ### Slot Capacity (atomic, SELECT FOR UPDATE)
 ```
 booked = SUM(oi.quantity) WHERE oi.used_ice_cream=true AND status!=cancelled
 effective_max = slot.max_ice_cream ?? event.max_ice_cream_per_slot
 ```
-`order_items.used_ice_cream` is a boolean snapshot set at order creation time — `true` when the item counted as an ice cream portion (mode=included, or mode=optional AND with_ice_cream=true). This decouples capacity accounting from the current `products.ice_cream_mode`, so retroactive mode changes don't corrupt historical booked counts.
-Slot is required only when `booked > 0`. `slot_id = null` is valid for orders with no ice cream items.
+`order_items.used_ice_cream` is a boolean snapshot set at order creation time. Slot picker pre-checks: `slot.booked_portions + cartIceCreamPortions(cart) > slot.max_ice_cream_effective` → slot shown as full. Capacity queries aggregate by `event_menu_item_id` to handle split rows from the same item.
 
 ### Capacity Enforcement
 - `POST /orders`: SELECT FOR UPDATE on slot + each event_menu_item in one transaction
 - `PATCH /admin/slots/{id}`: blocks `max_ice_cream` < current booked with 409 + `current_booked`
-- `PATCH /admin/events/{id}`: blocks `date/start_time/end_time/slot_duration_min` when `status != draft` (separate 409 "after publish") or when non-cancelled orders exist (backend check; UI guard hides fields for non-draft, so API-level block reached only via direct calls)
-- Frontend hides date/time/slot_duration inputs when `event.status !== "draft"` (UI guard; backend is authoritative)
+- `PATCH /admin/events/{id}`: blocks `date/start_time/end_time/slot_duration_min` when `status != draft` (UI guard hides those fields; backend is authoritative)
+- Frontend hides date/time/slot_duration inputs when `event.status !== "draft"`
 
 ### Slot Generation
 Generated on `POST /admin/events/{id}/publish` (draft → published). Algorithm:
@@ -97,6 +110,15 @@ Generated on `POST /admin/events/{id}/publish` (draft → published). Algorithm:
 - Admin can mark `picked_up` (irreversible — dialog required)
 - Admin can `cancel` confirmed orders only (`picked_up → cancelled` is blocked)
   — cancellation releases capacity (capacity query excludes cancelled orders)
+
+### Event Description
+`events.description` (Text, nullable) — shown to customers in a collapsible card between the header and menu. Editable by admin at any status. Added in migration 0002.
+
+### Event Deletion
+`DELETE /admin/events/{id}` — available for **all** statuses. Cascade order:
+1. All `orders` deleted manually (SQLAlchemy cascades to `order_items`)
+2. `db.flush()` — clears `order_items` FK refs before menu items are deleted
+3. Event deleted — cascades to `slots` and `menu_items` via ORM relationship
 
 ### Price Snapshot
 `unit_price` stored at order creation = `event_menu_items.price + ice_cream_addon_price` (if with_ice_cream=true). Never recalculated.
@@ -121,3 +143,12 @@ cd frontend && npm install && npm run dev  # customer + admin UI
 # Requires running frontend (npm run dev) and backend (docker-compose up)
 npx playwright test
 ```
+
+## After Python/backend changes
+The backend runs inside Docker and code is COPY-ed into the image — file edits on the host are NOT picked up automatically.
+```bash
+docker-compose build backend && docker-compose up -d backend
+```
+
+## QA Skill
+`.claude/commands/qa.md` defines a `/qa` slash command. Start a new Claude Code session in this directory and type `/qa` to run a full QA pass (health checks, API sanity, Playwright customer + admin flows, edge cases, summary report).

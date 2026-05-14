@@ -4,7 +4,7 @@ import type { UpcomingEvent } from "../../api/types";
 import EventPage from "./EventPage";
 
 export default function CustomerApp() {
-  const [event, setEvent] = useState<UpcomingEvent | null | undefined>(undefined);
+  const [event, setEvent]           = useState<UpcomingEvent | null | undefined>(undefined);
   const [networkError, setNetworkError] = useState(false);
 
   const load = () => {
@@ -18,15 +18,16 @@ export default function CustomerApp() {
 
   if (networkError) {
     return (
-      <div className="min-h-screen bg-warm-50 flex items-center justify-center p-4" dir="rtl">
-        <div className="text-center max-w-xs">
-          <div className="text-5xl mb-4">😕</div>
-          <p className="text-stone-700 font-medium mb-5">
-            המערכת לא זמינה כרגע, אנא נסה שוב בעוד מספר רגעים
-          </p>
+      <div className="min-h-screen flex items-center justify-center p-5" dir="rtl">
+        <div className="text-center max-w-xs animate-fade-in">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-caramel-100 flex items-center justify-center">
+            <span className="text-3xl">😕</span>
+          </div>
+          <p className="font-display font-bold text-xl text-chocolate mb-2">המערכת לא זמינה</p>
+          <p className="text-caramel-500 text-sm mb-6">אנא נסה שוב בעוד מספר רגעים</p>
           <button
             onClick={load}
-            className="bg-warm-600 text-white px-8 py-3 rounded-3xl font-semibold shadow-md hover:bg-warm-700 transition-colors"
+            className="bg-chocolate text-cream px-8 py-3 rounded-3xl font-bold shadow-button-lg hover:bg-chocolate-light transition-colors active:scale-95"
           >
             נסה שוב
           </button>
@@ -37,10 +38,10 @@ export default function CustomerApp() {
 
   if (event === undefined) {
     return (
-      <div className="min-h-screen bg-warm-50 flex items-center justify-center" dir="rtl">
-        <div className="text-center">
-          <div className="text-4xl mb-3 animate-bounce">🍦</div>
-          <p className="text-stone-500 text-sm">טוען...</p>
+      <div className="min-h-screen flex items-center justify-center" dir="rtl">
+        <div className="text-center animate-fade-in">
+          <div className="text-4xl mb-3" style={{ animation: "bounce 1s ease-in-out infinite" }}>🍦</div>
+          <p className="text-caramel-400 text-sm">טוען...</p>
         </div>
       </div>
     );
@@ -48,11 +49,13 @@ export default function CustomerApp() {
 
   if (event === null) {
     return (
-      <div className="min-h-screen bg-warm-50 flex items-center justify-center p-4" dir="rtl">
-        <div className="text-center max-w-xs">
-          <div className="text-5xl mb-4">🍨</div>
-          <p className="text-stone-700 font-semibold text-lg mb-2">אין אירוע קרוב כרגע</p>
-          <p className="text-stone-500 text-sm">עקוב אחרינו לעדכונים על האירוע הבא</p>
+      <div className="min-h-screen flex items-center justify-center p-5" dir="rtl">
+        <div className="text-center max-w-xs animate-fade-in">
+          <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-caramel-100 flex items-center justify-center">
+            <span className="text-4xl">🍨</span>
+          </div>
+          <h2 className="font-display font-bold text-2xl text-chocolate mb-2">אין אירוע קרוב</h2>
+          <p className="text-caramel-500 text-sm">עקוב אחרינו לעדכונים על האירוע הבא</p>
         </div>
       </div>
     );

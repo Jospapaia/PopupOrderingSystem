@@ -24,6 +24,7 @@ export interface MenuItemPublic {
 export interface UpcomingEvent {
   id: string;
   title: string;
+  description: string | null;
   date: string;
   start_time: string;
   end_time: string;
@@ -82,6 +83,7 @@ export interface ProductOut {
 export interface EventOut {
   id: string;
   title: string;
+  description: string | null;
   date: string;
   start_time: string;
   end_time: string;
@@ -132,8 +134,8 @@ export interface EventMenuItemOut {
 // Cart item used across customer order flow
 export interface CartItem {
   menuItem: MenuItemPublic;
-  quantity: number;
-  withIceCream: boolean;
+  quantityWithIceCream: number;
+  quantityWithoutIceCream: number;
 }
 
 // Typed payload interfaces for admin write calls
@@ -148,6 +150,7 @@ export interface EventCreatePayload {
 
 export interface EventUpdatePayload {
   title?: string;
+  description?: string | null;
   date?: string;
   start_time?: string;
   end_time?: string;

@@ -45,6 +45,7 @@ class ProductOut(BaseModel):
 
 class EventCreate(BaseModel):
     title: str
+    description: Optional[str] = None
     date: date
     start_time: time
     end_time: time
@@ -67,6 +68,7 @@ class EventCreate(BaseModel):
 
 class EventUpdate(BaseModel):
     title: Optional[str] = None
+    description: Optional[str] = None
     max_ice_cream_per_slot: Optional[int] = Field(None, ge=1)
     date: Optional[date] = None
     start_time: Optional[time] = None
@@ -84,6 +86,7 @@ class EventUpdate(BaseModel):
 class EventOut(BaseModel):
     id: uuid.UUID
     title: str
+    description: Optional[str] = None
     date: date
     start_time: time
     end_time: time
@@ -249,6 +252,7 @@ class OrderOut(BaseModel):
 class UpcomingEventOut(BaseModel):
     id: uuid.UUID
     title: str
+    description: Optional[str] = None
     date: date
     start_time: time
     end_time: time

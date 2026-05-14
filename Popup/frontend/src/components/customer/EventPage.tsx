@@ -6,40 +6,36 @@ import OrderForm from "./OrderForm";
 import Confirmation from "./Confirmation";
 import { createOrder, getUpcomingEvent, BASE, toApiError } from "../../api/client";
 import { formatDate, formatTimeRange } from "../../utils/format";
-import { needsSlotForCart } from "../../utils/cart";
+import { needsSlotForCart, cartIceCreamPortions, cartItemQuantity } from "../../utils/cart";
 
 type Step = "items" | "slot" | "name" | "done";
 
-interface Props {
-  event: UpcomingEvent;
-}
+interface Props { event: UpcomingEvent; }
+
 
 export default function EventPage({ event }: Props) {
-  const [step, setStep] = useState<Step>("items");
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [step, setStep]                 = useState<Step>("items");
+  const [cart, setCart]                 = useState<CartItem[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [order, setOrder] = useState<OrderOut | null>(null);
-  const [fullSlots, setFullSlots] = useState<Set<string>>(new Set());
-  const [eventSlots, setEventSlots] = useState(event.slots);
+  const [error, setError]               = useState<string | null>(null);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const descIsLong = (event.description?.length ?? 0) > 100;
+  const [order, setOrder]               = useState<OrderOut | null>(null);
+  const [fullSlots, setFullSlots]       = useState<Set<string>>(new Set());
+  const [eventSlots, setEventSlots]     = useState(event.slots);
 
   const needsSlot = needsSlotForCart(cart);
 
-  const refreshSlots = () => {
+  const refreshSlots = () =>
     getUpcomingEvent().then((res) => {
       if (res.event?.id === event.id) setEventSlots(res.event.slots);
     }).catch(() => {});
-  };
 
   const handleItemsDone = () => {
-    if (cart.every((ci) => ci.quantity === 0)) return;
+    if (cart.every((ci) => cartItemQuantity(ci) === 0)) return;
     setError(null);
-    if (needsSlot) {
-      refreshSlots();
-      setStep("slot");
-    } else {
-      setStep("name");
-    }
+    if (needsSlot) { refreshSlots(); setStep("slot"); }
+    else setStep("name");
   };
 
   const handleSlotSelected = (slotId: string) => {
@@ -47,23 +43,35 @@ export default function EventPage({ event }: Props) {
     setStep("name");
   };
 
-  const handleSubmit = async (customerName: string, notes: string) => {
+  const handleSubmit = async (customerName: string) => {
     setError(null);
     const items = cart
-      .filter((ci) => ci.quantity > 0)
-      .map((ci) => ({
-        event_menu_item_id: ci.menuItem.id,
-        quantity: ci.quantity,
-        with_ice_cream:
-          ci.menuItem.ice_cream_mode === "optional" ? ci.withIceCream : null,
-      }));
+      .filter((ci) => cartItemQuantity(ci) > 0)
+      .flatMap((ci) => {
+        const rows = [];
+        if (ci.quantityWithoutIceCream > 0) {
+          rows.push({
+            event_menu_item_id: ci.menuItem.id,
+            quantity: ci.quantityWithoutIceCream,
+            with_ice_cream: ci.menuItem.ice_cream_mode === "optional" ? false : null,
+          });
+        }
+        if (ci.quantityWithIceCream > 0) {
+          rows.push({
+            event_menu_item_id: ci.menuItem.id,
+            quantity: ci.quantityWithIceCream,
+            with_ice_cream: ci.menuItem.ice_cream_mode === "optional" ? true : null,
+          });
+        }
+        return rows;
+      });
 
     try {
       const result = await createOrder({
         event_id: event.id,
         slot_id: needsSlot ? selectedSlotId : null,
         customer_name: customerName,
-        notes: notes || null,
+        notes: null,
         items,
       });
       setOrder(result);
@@ -72,19 +80,13 @@ export default function EventPage({ event }: Props) {
       const e = toApiError(err);
       if (e.status === 409 && e.message.includes("עבר")) {
         setError("הסלוט שנבחר כבר עבר — אנא בחר סלוט אחר");
-        setSelectedSlotId(null);
-        setStep("slot");
+        setSelectedSlotId(null); setStep("slot");
       } else if (e.status === 409 && e.message.includes("סלוט")) {
         setError("הסלוט התמלא — אנא בחר סלוט אחר");
-        if (selectedSlotId) {
-          setFullSlots((prev) => new Set([...prev, selectedSlotId]));
-        }
-        setSelectedSlotId(null);
-        refreshSlots();
-        setStep("slot");
+        if (selectedSlotId) setFullSlots((p) => new Set([...p, selectedSlotId]));
+        setSelectedSlotId(null); refreshSlots(); setStep("slot");
       } else if (e.status === 409) {
-        setError(e.message || "הפריט אזל מהמלאי");
-        setStep("items");
+        setError(e.message || "הפריט אזל מהמלאי"); setStep("items");
       } else if (e.message === "NETWORK_ERROR") {
         setError("המערכת לא זמינה כרגע, אנא נסה שוב בעוד מספר רגעים");
       } else {
@@ -93,52 +95,111 @@ export default function EventPage({ event }: Props) {
     }
   };
 
+  const resetToStart = () => {
+    setStep("items");
+    setCart([]);
+    setSelectedSlotId(null);
+    setOrder(null);
+    setError(null);
+    setFullSlots(new Set());
+    refreshSlots();
+  };
+
   if (step === "done" && order) {
-    return <Confirmation order={order} cart={cart} slotStart={
-      selectedSlotId
-        ? eventSlots.find((s) => s.id === selectedSlotId)?.slot_start ?? null
-        : null
-    } />;
+    return (
+      <Confirmation
+        order={order}
+        cart={cart}
+        slotStart={selectedSlotId ? eventSlots.find((s) => s.id === selectedSlotId)?.slot_start ?? null : null}
+        onBack={resetToStart}
+      />
+    );
   }
 
+
   return (
-    <div className="min-h-screen bg-warm-50" dir="rtl">
-      {/* Logo / brand header */}
-      <header className="bg-warm-600 text-white text-center py-5 px-4 shadow-md">
-        {/* Logo placeholder — swap with <img> when ready */}
-        <div className="inline-flex items-center gap-2 mb-1">
-          <span className="text-3xl">🍦</span>
-          <span className="text-2xl font-extrabold tracking-wide">הפופ-אפ</span>
+    <div className="min-h-screen" dir="rtl">
+
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <header className="relative bg-chocolate text-cream overflow-hidden">
+        {/* warm glow blobs */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full bg-caramel-700/30 blur-3xl" />
+          <div className="absolute -bottom-4 left-8 w-32 h-32 rounded-full bg-gold/20 blur-2xl" />
         </div>
-        <p className="text-warm-100 text-sm font-medium">{event.title}</p>
-        <p className="text-warm-200 text-xs mt-0.5">
-          {formatDate(event.date)} · {formatTimeRange(event.start_time, event.end_time)}
-        </p>
+
+        <div className="relative z-10 text-center px-6 pt-8 pb-7">
+          {/* Logo placeholder */}
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full border border-gold/50 bg-gold/10 flex items-center justify-center shadow-lg">
+            <span className="text-2xl leading-none">🍦</span>
+          </div>
+
+          {/* Event title – big Frank Ruhl Libre */}
+          <h1 className="font-display font-bold text-[2rem] leading-snug text-cream mb-1">
+            {event.title}
+          </h1>
+
+          {/* Ornamental divider */}
+          <div className="flex items-center justify-center gap-2 my-2 opacity-50">
+            <div className="h-px w-10 bg-gold" />
+            <span className="text-gold text-xs">✦</span>
+            <div className="h-px w-10 bg-gold" />
+          </div>
+
+          <p className="text-caramel-300 text-sm tracking-wide">
+            {formatDate(event.date)} · {formatTimeRange(event.start_time, event.end_time)}
+          </p>
+        </div>
       </header>
 
-      {/* Step progress dots */}
-      {step !== "done" && (
-        <div className="flex justify-center gap-2 py-3">
-          {(["items", "slot", "name"] as const)
-            .filter((s) => s !== "slot" || needsSlot)
-            .map((s, i, arr) => (
-              <div
-                key={s}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  s === step
-                    ? "w-6 bg-warm-500"
-                    : arr.indexOf(step) > i
-                    ? "w-2 bg-warm-400"
-                    : "w-2 bg-warm-200"
-                }`}
-              />
-            ))}
+      {/* ── Description card ───────────────────────────────────────── */}
+      {step !== "done" && event.description && (
+        <div className="px-4 py-4 bg-parchment/50">
+          <div className="max-w-sm mx-auto">
+
+            {/* ornamental rule */}
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent to-caramel-300/50" />
+              <span className="text-gold text-[10px] tracking-widest opacity-70">✦</span>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent to-caramel-300/50" />
+            </div>
+
+            {/* box */}
+            <div className="relative bg-white/80 border border-caramel-200/70 rounded-2xl px-5 py-4 text-center shadow-sm overflow-hidden">
+              <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
+              <p className={`text-sm text-caramel-700 leading-relaxed ${!descExpanded && descIsLong ? "line-clamp-3" : ""}`}>
+                {event.description}
+              </p>
+              {!descExpanded && descIsLong && (
+                <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-white/90 to-transparent pointer-events-none" />
+              )}
+            </div>
+
+            {/* toggle */}
+            {descIsLong && (
+              <button
+                onClick={() => setDescExpanded((v) => !v)}
+                className="w-full text-center text-xs text-caramel-400 mt-2 py-0.5 hover:text-chocolate transition-colors"
+              >
+                {descExpanded ? "הסתר ↑" : "קרא עוד ↓"}
+              </button>
+            )}
+
+            {/* ornamental rule */}
+            <div className="flex items-center gap-3 mt-3">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent to-caramel-300/50" />
+              <span className="text-gold text-[10px] tracking-widest opacity-70">✦</span>
+              <div className="flex-1 h-px bg-gradient-to-l from-transparent to-caramel-300/50" />
+            </div>
+
+          </div>
         </div>
       )}
 
-      <main className="max-w-md mx-auto px-4 pb-6">
+      {/* ── Content ───────────────────────────────────────────────── */}
+      <main className="max-w-md mx-auto px-4 pb-8 pt-2">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-3 mb-4 text-sm text-center">
+          <div className="mt-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-sm text-center animate-fade-in">
             {error}
           </div>
         )}
@@ -157,6 +218,7 @@ export default function EventPage({ event }: Props) {
             slots={eventSlots}
             extraFullSlots={fullSlots}
             selectedSlotId={selectedSlotId}
+            iceCreamPortions={cartIceCreamPortions(cart)}
             onSelect={handleSlotSelected}
             onBack={() => setStep("items")}
           />
@@ -164,13 +226,9 @@ export default function EventPage({ event }: Props) {
         {step === "name" && (
           <OrderForm
             cart={cart}
-            slotStart={
-              selectedSlotId
-                ? eventSlots.find((s) => s.id === selectedSlotId)?.slot_start ?? null
-                : null
-            }
+            slotStart={selectedSlotId ? eventSlots.find((s) => s.id === selectedSlotId)?.slot_start ?? null : null}
             onSubmit={handleSubmit}
-            onBack={() => { if (needsSlot) { refreshSlots(); setStep("slot"); } else { setStep("items"); } }}
+            onBack={() => { if (needsSlot) { refreshSlots(); setStep("slot"); } else setStep("items"); }}
           />
         )}
       </main>

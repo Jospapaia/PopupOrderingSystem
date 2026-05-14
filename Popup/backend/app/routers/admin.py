@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select, func, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
@@ -258,14 +259,14 @@ def delete_event(event_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
-    if event.status != EventStatus.draft:
-        raise HTTPException(status_code=409, detail="ניתן למחוק רק אירועים בסטטוס טיוטה")
-    has_orders = db.execute(
-        select(func.count(Order.id))
-        .where(Order.event_id == event_id, Order.status != OrderStatus.cancelled)
-    ).scalar_one()
-    if has_orders:
-        raise HTTPException(status_code=409, detail="לא ניתן למחוק אירוע עם הזמנות קיימות")
+
+    # Delete orders first so OrderItems (which reference EventMenuItems) are
+    # removed before the cascade on Event.menu_items fires.
+    orders = db.execute(select(Order).where(Order.event_id == event_id)).scalars().all()
+    for order in orders:
+        db.delete(order)
+    db.flush()
+
     db.delete(event)
     db.commit()
 
@@ -385,7 +386,11 @@ def add_menu_item(event_id: uuid.UUID, payload: EventMenuItemCreate, db: Session
         raise HTTPException(status_code=404, detail="המוצר לא נמצא")
     item = EventMenuItem(event_id=event_id, **payload.model_dump())
     db.add(item)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="המוצר כבר קיים בתפריט האירוע")
     db.refresh(item)
     db.refresh(item.product)
     return _build_menu_item_out(item)

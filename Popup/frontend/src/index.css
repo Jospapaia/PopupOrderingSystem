@@ -1,17 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Secular+One&family=Rubik:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --cream:     #fdf4e3;
+    --parchment: #f5e8d0;
+    --caramel:   #c8762a;
+    --gold:      #d4a853;
+    --choco:     #2a1400;
+  }
+
+  html {
+    background: var(--cream);
+  }
+
   body {
-    background-color: #fdf8f0;
-    color: #3a2a1a;
+    font-family: 'Rubik', system-ui, sans-serif;
+    background: radial-gradient(ellipse 120% 60% at 60% 0%, #f5e0c4 0%, #fdf4e3 55%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: var(--choco);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   * {
     -webkit-tap-highlight-color: transparent;
   }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Frank Ruhl Libre', serif;
+  }
+
+  /* Grain texture overlay on any element */
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.04;
+    border-radius: inherit;
+  }
+
+  .stagger-1 { animation-delay: 0ms;   animation-fill-mode: both; }
+  .stagger-2 { animation-delay: 70ms;  animation-fill-mode: both; }
+  .stagger-3 { animation-delay: 140ms; animation-fill-mode: both; }
+  .stagger-4 { animation-delay: 210ms; animation-fill-mode: both; }
+  .stagger-5 { animation-delay: 280ms; animation-fill-mode: both; }
 }

@@ -1,18 +1,17 @@
 import { useState, type FormEvent } from "react";
 import type { CartItem } from "../../api/types";
 import { formatTime } from "../../utils/format";
-import { cartTotal, itemLineTotal } from "../../utils/cart";
+import { cartTotal, cartItemQuantity } from "../../utils/cart";
 
 interface Props {
   cart: CartItem[];
   slotStart: string | null;
-  onSubmit: (name: string, notes: string) => Promise<void>;
+  onSubmit: (name: string) => Promise<void>;
   onBack: () => void;
 }
 
 export default function OrderForm({ cart, slotStart, onSubmit, onBack }: Props) {
-  const [name, setName] = useState("");
-  const [notes, setNotes] = useState("");
+  const [name,    setName]    = useState("");
   const [loading, setLoading] = useState(false);
 
   const total = cartTotal(cart);
@@ -21,58 +20,85 @@ export default function OrderForm({ cart, slotStart, onSubmit, onBack }: Props) 
     e.preventDefault();
     if (!name.trim()) return;
     setLoading(true);
-    try {
-      await onSubmit(name.trim(), notes);
-    } finally {
-      setLoading(false);
-    }
+    try { await onSubmit(name.trim()); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div className="pt-2">
+    <div className="pt-3 animate-fade-in">
+      {/* Back */}
       <button
         onClick={onBack}
-        className="flex items-center gap-1 text-warm-600 text-sm font-medium mb-5 hover:text-warm-700"
+        className="flex items-center gap-1.5 text-caramel-600 text-sm font-medium mb-5 hover:text-caramel-700 transition-colors"
       >
-        <span className="text-lg">›</span>
+        <span className="text-base leading-none">›</span>
         <span>חזור</span>
       </button>
 
-      <h2 className="text-xl font-bold text-stone-800 mb-5">סיכום הזמנה</h2>
+      <h2 className="font-display font-bold text-2xl text-chocolate mb-5">סיכום הזמנה</h2>
 
-      {/* Order summary card */}
-      <div className="bg-white rounded-3xl shadow-card p-4 mb-6">
-        <div className="space-y-2">
-          {cart.filter((ci) => ci.quantity > 0).map((ci) => (
-            <div key={ci.menuItem.id} className="flex justify-between items-center text-stone-700">
-              <span className="text-sm">
-                {ci.menuItem.product_name}
-                {ci.quantity > 1 && <span className="text-stone-400"> ×{ci.quantity}</span>}
-                {ci.menuItem.ice_cream_mode === "optional" && ci.withIceCream && (
-                  <span className="text-warm-500"> + גלידה</span>
-                )}
-              </span>
-              <span className="font-semibold text-sm">₪{itemLineTotal(ci).toFixed(0)}</span>
-            </div>
-          ))}
+      {/* Receipt card */}
+      <div className="bg-white rounded-3xl shadow-card overflow-hidden mb-5">
+        {/* Items */}
+        <div className="px-5 pt-5 pb-3 space-y-2.5">
+          {cart.filter((ci) => cartItemQuantity(ci) > 0).flatMap((ci) => {
+            const rows = [];
+            if (ci.quantityWithoutIceCream > 0) {
+              rows.push(
+                <div key={`${ci.menuItem.id}-plain`} className="flex justify-between items-center">
+                  <span className="text-chocolate text-sm leading-snug">
+                    <span className="font-semibold">{ci.menuItem.product_name}</span>
+                    {ci.quantityWithoutIceCream > 1 && <span className="text-caramel-400 font-normal"> ×{ci.quantityWithoutIceCream}</span>}
+                  </span>
+                  <span className="font-bold text-chocolate text-sm mr-3 shrink-0">
+                    ₪{(ci.menuItem.price * ci.quantityWithoutIceCream).toFixed(0)}
+                  </span>
+                </div>
+              );
+            }
+            if (ci.quantityWithIceCream > 0) {
+              const priceEach = ci.menuItem.price + (ci.menuItem.ice_cream_addon_price ?? 0);
+              rows.push(
+                <div key={`${ci.menuItem.id}-ice`} className="flex justify-between items-center">
+                  <span className="text-chocolate text-sm leading-snug">
+                    <span className="font-semibold">{ci.menuItem.product_name}</span>
+                    {ci.menuItem.ice_cream_mode === "optional" && <span className="text-caramel-500"> + גלידה 🍦</span>}
+                    {ci.quantityWithIceCream > 1 && <span className="text-caramel-400 font-normal"> ×{ci.quantityWithIceCream}</span>}
+                  </span>
+                  <span className="font-bold text-chocolate text-sm mr-3 shrink-0">
+                    ₪{(priceEach * ci.quantityWithIceCream).toFixed(0)}
+                  </span>
+                </div>
+              );
+            }
+            return rows;
+          })}
         </div>
 
-        {slotStart && (
-          <div className="mt-3 pt-3 border-t border-stone-100 flex items-center gap-2 text-stone-600 text-sm">
-            <span>🕐</span>
-            <span>איסוף בשעה {formatTime(slotStart)}</span>
-          </div>
-        )}
+        {/* Dashed separator */}
+        <div className="mx-5 border-t border-dashed border-caramel-200 my-1" />
 
-        <div className="mt-3 pt-3 border-t border-stone-100 flex justify-between items-center">
-          <span className="font-bold text-stone-800">סה"כ לתשלום</span>
-          <span className="font-extrabold text-warm-600 text-xl">₪{total.toFixed(0)}</span>
+        {/* Slot + total */}
+        <div className="px-5 py-3 space-y-2">
+          {slotStart && (
+            <div className="flex items-center gap-2 text-caramel-600 text-sm">
+              <span>🕐</span>
+              <span>איסוף בשעה <strong className="font-bold text-chocolate">{formatTime(slotStart)}</strong></span>
+            </div>
+          )}
+          <div className="flex justify-between items-baseline">
+            <span className="font-bold text-chocolate">סה״כ לתשלום</span>
+            <span className="font-display font-bold text-2xl text-caramel-500">₪{total.toFixed(0)}</span>
+          </div>
         </div>
       </div>
 
+      {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-semibold text-stone-700 mb-1.5">שמך *</label>
+          <label className="block text-sm font-bold text-chocolate mb-1.5">
+            שמך <span className="text-caramel-500">*</span>
+          </label>
           <input
             type="text"
             value={name}
@@ -80,32 +106,31 @@ export default function OrderForm({ cart, slotStart, onSubmit, onBack }: Props) 
             maxLength={100}
             required
             autoFocus
-            className="w-full bg-white border-2 border-stone-200 focus:border-warm-400 rounded-2xl px-4 py-3 text-base outline-none transition-colors"
             placeholder="הכנס שמך"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-stone-700 mb-1.5">
-            בקשות מיוחדות
-            <span className="text-stone-400 font-normal"> (אופציונלי)</span>
-          </label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            maxLength={300}
-            rows={3}
-            className="w-full bg-white border-2 border-stone-200 focus:border-warm-400 rounded-2xl px-4 py-3 text-base outline-none transition-colors resize-none"
-            placeholder="אלרגיות, בקשות מיוחדות..."
+            className="
+              w-full bg-white border-2 border-caramel-200 focus:border-caramel-500
+              rounded-2xl px-4 py-3 text-base text-chocolate outline-none
+              transition-colors placeholder:text-caramel-300
+            "
           />
         </div>
 
         <button
           type="submit"
           disabled={loading || !name.trim()}
-          className="w-full bg-warm-600 hover:bg-warm-700 disabled:bg-warm-200 text-white py-4 rounded-3xl font-bold text-lg shadow-md transition-colors"
+          className="
+            relative w-full overflow-hidden bg-chocolate text-cream py-4 rounded-3xl
+            font-bold text-lg shadow-button-lg transition-all duration-150
+            active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed
+            hover:bg-chocolate-light
+          "
         >
-          {loading ? "שולח הזמנה..." : "אשר הזמנה ✓"}
+          <span className="relative z-10 font-display">
+            {loading ? "שולח הזמנה..." : "אשר הזמנה ✓"}
+          </span>
+          {!loading && (
+            <span className="absolute inset-0 bg-gradient-to-l from-transparent via-white/8 to-transparent animate-shimmer" />
+          )}
         </button>
       </form>
     </div>
