@@ -8,7 +8,7 @@ ssh $SERVER "cd $APP_DIR && git pull && docker compose up -d --build backend && 
 Write-Host "-> Verifying health..."
 Start-Sleep -Seconds 3
 
-$response = curl -s https://api.yossiscookies.store/health
+$response = curl.exe -s https://api.yossiscookies.store/health
 if ($response -match "ok") {
     Write-Host "OK Backend healthy"
 } else {
