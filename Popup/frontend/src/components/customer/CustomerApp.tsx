@@ -54,8 +54,7 @@ export default function CustomerApp() {
           <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-caramel-100 flex items-center justify-center">
             <span className="text-4xl">🍨</span>
           </div>
-          <h2 className="font-display font-bold text-2xl text-chocolate mb-2">אין אירוע קרוב</h2>
-          <p className="text-caramel-500 text-sm">עקוב אחרינו לעדכונים על האירוע הבא</p>
+          <h2 className="font-display font-bold text-2xl text-chocolate">אין אירוע קרוב</h2>
         </div>
       </div>
     );
