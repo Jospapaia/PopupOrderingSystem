@@ -10,7 +10,7 @@ Start-Sleep -Seconds 3
 
 $response = curl -s https://api.yossiscookies.store/health
 if ($response -match "ok") {
-    Write-Host "✓ Backend healthy"
+    Write-Host "OK Backend healthy"
 } else {
-    Write-Host "✗ Health check failed: $response"
+    Write-Host "FAIL Health check failed: $response"
 }
