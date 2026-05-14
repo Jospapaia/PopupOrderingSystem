@@ -5,9 +5,8 @@ test.describe("Slot capacity enforcement", () => {
     await page.goto("/");
     await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
 
-    // Select an item
-    const plusBtn = page.locator("button:has-text('+')").first();
-    await plusBtn.click();
+    // Add item to cart, then proceed
+    await page.locator("button:has-text('הוספה להזמנה')").first().click();
     await page.click("button:has-text('המשך להזמנה')");
 
     // Full slots should be disabled
@@ -23,11 +22,10 @@ test.describe("Slot capacity enforcement", () => {
     await page.goto("/");
     await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
 
-    const plusBtn = page.locator("button:has-text('+')").first();
-    await plusBtn.click();
+    await page.locator("button:has-text('הוספה להזמנה')").first().click();
     await page.click("button:has-text('המשך להזמנה')");
 
-    const slotHeader = page.locator("h2:has-text('בחר שעת איסוף')");
+    const slotHeader = page.locator("h2:has-text('שעת איסוף')");
     if (!(await slotHeader.isVisible().catch(() => false))) {
       // First item has ice_cream_mode=none; skip slot-full test scenario
       return;
@@ -46,11 +44,11 @@ test.describe("Slot capacity enforcement", () => {
     if ((await slotBtn.count()) === 0) return;
     await slotBtn.click();
 
-    await expect(page.locator("h2:has-text('פרטי ההזמנה')")).toBeVisible();
-    await page.fill("input[placeholder='הכנס שמך']", "ישראל ישראלי");
-    await page.click("button:has-text('אשר הזמנה')");
+    await expect(page.locator("h2:has-text('סיכום הזמנה')")).toBeVisible();
+    await page.fill("input[placeholder='שם']", "ישראל ישראלי");
+    await page.click("button:has-text('אישור הזמנה')");
 
     await expect(page.locator("text=הסלוט התמלא")).toBeVisible({ timeout: 5000 });
-    await expect(page.locator("h2:has-text('בחר שעת איסוף')")).toBeVisible();
+    await expect(page.locator("h2:has-text('שעת איסוף')")).toBeVisible();
   });
 });

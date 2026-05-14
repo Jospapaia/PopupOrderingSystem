@@ -32,7 +32,7 @@ export default function OrderForm({ cart, slotStart, onSubmit, onBack }: Props) 
         className="flex items-center gap-1.5 text-caramel-600 text-sm font-medium mb-5 hover:text-caramel-700 transition-colors"
       >
         <span className="text-base leading-none">›</span>
-        <span>חזור</span>
+        <span>חזרה</span>
       </button>
 
       <h2 className="font-display font-bold text-2xl text-chocolate mb-5">סיכום הזמנה</h2>
@@ -97,7 +97,7 @@ export default function OrderForm({ cart, slotStart, onSubmit, onBack }: Props) 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-bold text-chocolate mb-1.5">
-            שמך <span className="text-caramel-500">*</span>
+            שם <span className="text-caramel-500">*</span>
           </label>
           <input
             type="text"
@@ -106,7 +106,7 @@ export default function OrderForm({ cart, slotStart, onSubmit, onBack }: Props) 
             maxLength={100}
             required
             autoFocus
-            placeholder="הכנס שמך"
+            placeholder="שם"
             className="
               w-full bg-white border-2 border-caramel-200 focus:border-caramel-500
               rounded-2xl px-4 py-3 text-base text-chocolate outline-none
@@ -126,7 +126,7 @@ export default function OrderForm({ cart, slotStart, onSubmit, onBack }: Props) 
           "
         >
           <span className="relative z-10 font-display">
-            {loading ? "שולח הזמנה..." : "אשר הזמנה ✓"}
+            {loading ? "שליחת הזמנה..." : "אישור הזמנה ✓"}
           </span>
           {!loading && (
             <span className="absolute inset-0 bg-gradient-to-l from-transparent via-white/8 to-transparent animate-shimmer" />

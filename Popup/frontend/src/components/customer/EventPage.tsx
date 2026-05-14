@@ -79,10 +79,10 @@ export default function EventPage({ event }: Props) {
     } catch (err: unknown) {
       const e = toApiError(err);
       if (e.status === 409 && e.message.includes("עבר")) {
-        setError("הסלוט שנבחר כבר עבר — אנא בחר סלוט אחר");
+        setError("הסלוט שנבחר כבר עבר — נא לבחור שעה אחרת");
         setSelectedSlotId(null); setStep("slot");
       } else if (e.status === 409 && e.message.includes("סלוט")) {
-        setError("הסלוט התמלא — אנא בחר סלוט אחר");
+        setError("הסלוט התמלא — נא לבחור שעה אחרת");
         if (selectedSlotId) setFullSlots((p) => new Set([...p, selectedSlotId]));
         setSelectedSlotId(null); refreshSlots(); setStep("slot");
       } else if (e.status === 409) {
@@ -181,7 +181,7 @@ export default function EventPage({ event }: Props) {
                 onClick={() => setDescExpanded((v) => !v)}
                 className="w-full text-center text-xs text-caramel-400 mt-2 py-0.5 hover:text-chocolate transition-colors"
               >
-                {descExpanded ? "הסתר ↑" : "קרא עוד ↓"}
+                {descExpanded ? "סגירה ↑" : "קריאה נוספת ↓"}
               </button>
             )}
 

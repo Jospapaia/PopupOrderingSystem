@@ -148,7 +148,7 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl }:
                     }
                     className="relative w-full overflow-hidden bg-chocolate text-cream font-semibold py-2.5 rounded-2xl text-base transition-all duration-200 active:scale-[0.97] hover:bg-chocolate-light"
                   >
-                    <span className="relative z-10">הוסף להזמנה</span>
+                    <span className="relative z-10">הוספה להזמנה</span>
                     <span className="absolute inset-0 bg-gradient-to-l from-transparent via-white/10 to-transparent animate-shimmer" />
                   </button>
 

@@ -21,13 +21,13 @@ export default function SlotPicker({ slots, extraFullSlots, selectedSlotId, iceC
         className="flex items-center gap-1.5 text-caramel-600 text-sm font-medium mb-5 hover:text-caramel-700 transition-colors"
       >
         <span className="text-base leading-none">›</span>
-        <span>חזור לתפריט</span>
+        <span>חזרה לתפריט</span>
       </button>
 
       {/* Heading */}
       <div className="mb-5">
-        <h2 className="font-display font-bold text-2xl text-chocolate">מתי תגיע?</h2>
-        <p className="text-caramel-500 text-sm mt-0.5">בחר שעת איסוף</p>
+        <h2 className="font-display font-bold text-2xl text-chocolate">שעת איסוף</h2>
+        <p className="text-caramel-500 text-sm mt-0.5">בחירת שעה</p>
       </div>
 
       {/* Slot grid */}
