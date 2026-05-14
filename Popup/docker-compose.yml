@@ -29,7 +29,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - uploads:/app/static/uploads
     command: sh -c "alembic upgrade head && gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000"
 
 volumes:
   pgdata:
+  uploads:
