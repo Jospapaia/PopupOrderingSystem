@@ -64,6 +64,7 @@ class Event(Base):
     end_time: Mapped[time] = mapped_column(Time, nullable=False)
     slot_duration_min: Mapped[int] = mapped_column(Integer, nullable=False)
     max_ice_cream_per_slot: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_ice_cream_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[EventStatus] = mapped_column(
         SAEnum(EventStatus, name="event_status", create_type=True),
         nullable=False,

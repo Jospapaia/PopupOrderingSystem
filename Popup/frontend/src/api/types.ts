@@ -28,6 +28,8 @@ export interface UpcomingEvent {
   date: string;
   start_time: string;
   end_time: string;
+  max_ice_cream_total: number | null;
+  ice_cream_total_remaining: number | null;
   slots: SlotPublic[];
   menu_items: MenuItemPublic[];
 }
@@ -89,6 +91,7 @@ export interface EventOut {
   end_time: string;
   slot_duration_min: number;
   max_ice_cream_per_slot: number;
+  max_ice_cream_total: number | null;
   status: EventStatus;
   created_at: string;
 }
@@ -156,6 +159,7 @@ export interface EventUpdatePayload {
   end_time?: string;
   slot_duration_min?: number;
   max_ice_cream_per_slot?: number;
+  max_ice_cream_total?: number | null;
 }
 
 export interface ProductCreatePayload {

@@ -111,6 +111,11 @@ def _get_upcoming_event_data(db: Session, today: date) -> UpcomingEventResponse:
             image_url=item.product.image_url,
         ))
 
+    total_booked = sum(s.booked_portions for s in slots_out)
+    ice_cream_total_remaining: int | None = None
+    if event.max_ice_cream_total is not None:
+        ice_cream_total_remaining = max(0, event.max_ice_cream_total - total_booked)
+
     return UpcomingEventResponse(
         event=UpcomingEventOut(
             id=event.id,
@@ -119,6 +124,8 @@ def _get_upcoming_event_data(db: Session, today: date) -> UpcomingEventResponse:
             date=event.date,
             start_time=event.start_time,
             end_time=event.end_time,
+            max_ice_cream_total=event.max_ice_cream_total,
+            ice_cream_total_remaining=ice_cream_total_remaining,
             slots=slots_out,
             menu_items=menu_out,
         )

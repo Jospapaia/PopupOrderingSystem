@@ -134,14 +134,20 @@ function CreateProductForm({ onDone, onCancel, onError }: CreateProductFormProps
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<IceCreamMode>("none");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     try {
-      const p = await adminCreateProduct({ name, description: description || undefined, ice_cream_mode: mode });
+      let p = await adminCreateProduct({ name, description: description || undefined, ice_cream_mode: mode });
+      if (imageFile) p = await adminUploadProductImage(p.id, imageFile);
       onDone(p);
     } catch (err: unknown) {
       onError(toApiError(err).message);
+      setLoading(false);
     }
   };
 
@@ -174,15 +180,26 @@ function CreateProductForm({ onDone, onCancel, onError }: CreateProductFormProps
           <option key={m} value={m}>{ICE_CREAM_MODE_LABELS[m]}</option>
         ))}
       </select>
-      <div className="flex gap-2">
-        <button type="submit"
-          className="bg-chocolate text-cream px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-chocolate-light transition-colors">
-          צור
+      <div className="flex gap-2 items-center flex-wrap">
+        <button type="submit" disabled={loading}
+          className="bg-chocolate text-cream px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-chocolate-light transition-colors disabled:opacity-50">
+          {loading ? "יוצר..." : "צור"}
         </button>
-        <button type="button" onClick={onCancel}
+        <button type="button" onClick={onCancel} disabled={loading}
           className="bg-parchment border border-caramel-200 text-chocolate px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-caramel-100 transition-colors">
           ביטול
         </button>
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={loading}
+          className="bg-caramel-100 border border-caramel-200 text-caramel-600 px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-caramel-200 transition-colors disabled:opacity-50">
+          {imageFile ? `📷 ${imageFile.name}` : "📷 תמונה"}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/jpeg,image/png"
+          className="hidden"
+          onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+        />
       </div>
     </form>
   );

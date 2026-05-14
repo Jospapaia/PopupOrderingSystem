@@ -21,6 +21,7 @@ interface EventEditForm {
   title: string;
   description: string;
   max_ice_cream_per_slot: number;
+  max_ice_cream_total: number | null;
   date: string;
   start_time: string;
   end_time: string;
@@ -65,6 +66,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       title: event.title,
       description: event.description ?? "",
       max_ice_cream_per_slot: event.max_ice_cream_per_slot,
+      max_ice_cream_total: event.max_ice_cream_total ?? null,
       date: event.date,
       start_time: event.start_time.slice(0, 5),
       end_time: event.end_time.slice(0, 5),
@@ -132,6 +134,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       if (editForm.title !== undefined) payload.title = editForm.title;
       if (editForm.description !== undefined) payload.description = editForm.description !== "" ? editForm.description : null;
       if (editForm.max_ice_cream_per_slot !== undefined) payload.max_ice_cream_per_slot = editForm.max_ice_cream_per_slot;
+      if ("max_ice_cream_total" in editForm) payload.max_ice_cream_total = editForm.max_ice_cream_total ?? null;
       if (event.status === "draft") {
         if (editForm.date !== undefined) payload.date = editForm.date;
         if (editForm.start_time !== undefined) payload.start_time = editForm.start_time;
@@ -296,6 +299,20 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                 <input type="number" min="1" value={editForm.max_ice_cream_per_slot ?? ""}
                   onChange={(e) => setEditForm({ ...editForm, max_ice_cream_per_slot: e.target.valueAsNumber })}
                   className={inputCls} />
+              </div>
+              <div className={lockedFields ? "col-span-2" : ""}>
+                <label className="block text-xs font-semibold text-caramel-500 mb-1">מכסת גלידה כוללת לאירוע</label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="השאר ריק ללא הגבלה"
+                  value={editForm.max_ice_cream_total ?? ""}
+                  onChange={(e) => setEditForm({
+                    ...editForm,
+                    max_ice_cream_total: e.target.value !== "" ? e.target.valueAsNumber : null,
+                  })}
+                  className={inputCls}
+                />
               </div>
               {!lockedFields && (
                 <>

@@ -51,6 +51,7 @@ class EventCreate(BaseModel):
     end_time: time
     slot_duration_min: int
     max_ice_cream_per_slot: int = Field(..., ge=1)
+    max_ice_cream_total: Optional[int] = Field(None, ge=1)
 
     @field_validator("slot_duration_min")
     @classmethod
@@ -70,6 +71,7 @@ class EventUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     max_ice_cream_per_slot: Optional[int] = Field(None, ge=1)
+    max_ice_cream_total: Optional[int] = Field(None, ge=1)
     date: Optional[date] = None
     start_time: Optional[time] = None
     end_time: Optional[time] = None
@@ -92,6 +94,7 @@ class EventOut(BaseModel):
     end_time: time
     slot_duration_min: int
     max_ice_cream_per_slot: int
+    max_ice_cream_total: Optional[int] = None
     status: EventStatus
     created_at: datetime
 
@@ -256,6 +259,8 @@ class UpcomingEventOut(BaseModel):
     date: date
     start_time: time
     end_time: time
+    max_ice_cream_total: Optional[int] = None
+    ice_cream_total_remaining: Optional[int] = None
     slots: List[SlotPublicOut]
     menu_items: List[EventMenuItemPublicOut]
 

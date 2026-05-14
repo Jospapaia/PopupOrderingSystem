@@ -19,7 +19,7 @@ export default function EventPage({ event }: Props) {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [error, setError]               = useState<string | null>(null);
   const [descExpanded, setDescExpanded] = useState(false);
-  const descIsLong = (event.description?.length ?? 0) > 100;
+  const descIsLong = (event.description?.length ?? 0) > 180;
   const [order, setOrder]               = useState<OrderOut | null>(null);
   const [fullSlots, setFullSlots]       = useState<Set<string>>(new Set());
   const [eventSlots, setEventSlots]     = useState(event.slots);
@@ -204,13 +204,26 @@ export default function EventPage({ event }: Props) {
         )}
 
         {step === "items" && (
-          <ItemList
-            menuItems={event.menu_items}
-            cart={cart}
-            onChange={setCart}
-            onNext={handleItemsDone}
-            baseUrl={BASE}
-          />
+          <>
+            {/* Event-wide ice cream cap banner */}
+            {event.ice_cream_total_remaining === 0 ? (
+              <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl px-4 py-3 text-sm text-center font-semibold">
+                מנות הגלידה אזלו
+              </div>
+            ) : event.ice_cream_total_remaining !== null && event.ice_cream_total_remaining <= 5 ? (
+              <div className="mt-3 bg-caramel-50 border border-caramel-200 text-caramel-700 rounded-2xl px-4 py-3 text-sm text-center font-medium">
+                נשארו {event.ice_cream_total_remaining} מנות גלידה לאירוע
+              </div>
+            ) : null}
+            <ItemList
+              menuItems={event.menu_items}
+              cart={cart}
+              onChange={setCart}
+              onNext={handleItemsDone}
+              baseUrl={BASE}
+              iceCreamTotalRemaining={event.ice_cream_total_remaining}
+            />
+          </>
         )}
         {step === "slot" && (
           <SlotPicker

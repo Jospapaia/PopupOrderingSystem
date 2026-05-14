@@ -230,7 +230,7 @@ def update_event(event_id: uuid.UUID, payload: EventUpdate, db: Session = Depend
     if event is None:
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
 
-    update_data = payload.model_dump(exclude_none=True)
+    update_data = payload.model_dump(exclude_unset=True)
     if _requires_lock_check(update_data):
         if event.status != EventStatus.draft:
             raise HTTPException(

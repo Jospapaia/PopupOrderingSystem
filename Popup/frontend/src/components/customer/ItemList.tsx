@@ -7,6 +7,7 @@ interface Props {
   onChange: (cart: CartItem[]) => void;
   onNext: () => void;
   baseUrl: string;
+  iceCreamTotalRemaining: number | null;
 }
 
 const PLACEHOLDER_GRADIENTS = [
@@ -19,7 +20,7 @@ const PLACEHOLDER_GRADIENTS = [
 
 const PLACEHOLDER_ICONS = ["🍨", "🍦", "🍰", "🧁", "🍮"];
 
-export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl }: Props) {
+export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, iceCreamTotalRemaining }: Props) {
   const getCartItem = (item: MenuItemPublic): CartItem =>
     cart.find((ci) => ci.menuItem.id === item.id) ??
     { menuItem: item, quantityWithIceCream: 0, quantityWithoutIceCream: 0 };
@@ -94,7 +95,12 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl }:
           const isOutOfStock = item.remaining_quantity === 0;
           const inCart       = totalQty > 0;
           const isOptional   = item.ice_cream_mode === "optional";
-          const simpleQty    = item.ice_cream_mode === "included" ? ci.quantityWithIceCream : ci.quantityWithoutIceCream;
+          const isIncluded   = item.ice_cream_mode === "included";
+          const simpleQty    = isIncluded ? ci.quantityWithIceCream : ci.quantityWithoutIceCream;
+          const isLowStock   = item.remaining_quantity > 0 && item.remaining_quantity <= 5;
+          const iceCreamExhausted = iceCreamTotalRemaining === 0;
+          const iceCreamLow  = iceCreamTotalRemaining !== null && iceCreamTotalRemaining > 0 && iceCreamTotalRemaining <= 5;
+          const hasIceCreamMode = item.ice_cream_mode !== "none";
 
           return (
             <div
@@ -127,7 +133,7 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl }:
 
               <div className="p-4 pt-3">
                 {/* Name + price */}
-                <div className="flex justify-between items-baseline mb-3">
+                <div className="flex justify-between items-baseline mb-1">
                   <span className="font-display font-bold text-[1.15rem] text-chocolate leading-tight">
                     {item.product_name}
                   </span>
@@ -136,8 +142,42 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl }:
                   </span>
                 </div>
 
+                {/* Ice cream mode badge */}
+                {isIncluded && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-caramel-600 bg-caramel-50 border border-caramel-200/70 rounded-full px-2 py-0.5 mb-1.5">
+                    🍦 כולל גלידה
+                  </span>
+                )}
+                {isOptional && item.ice_cream_addon_price ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-caramel-500 bg-caramel-50 border border-caramel-200/70 rounded-full px-2 py-0.5 mb-1.5">
+                    🍦 גלידה אפשרית · +₪{item.ice_cream_addon_price.toFixed(0)}
+                  </span>
+                ) : isOptional ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-caramel-500 bg-caramel-50 border border-caramel-200/70 rounded-full px-2 py-0.5 mb-1.5">
+                    🍦 גלידה אפשרית
+                  </span>
+                ) : null}
+
+                {/* Low stock badge */}
+                {isLowStock && (
+                  <p className="text-xs font-semibold text-orange-600 mb-2">
+                    נשארו {item.remaining_quantity} מנות
+                  </p>
+                )}
+
+                {/* Ice cream low stock badge (event-wide cap) */}
+                {hasIceCreamMode && iceCreamLow && iceCreamTotalRemaining !== null && (
+                  <p className="text-xs font-semibold text-orange-500 mb-2">
+                    נשארו {iceCreamTotalRemaining} מנות גלידה
+                  </p>
+                )}
+
                 {isOutOfStock ? (
                   <p className="text-center text-sm text-caramel-400 py-1 tracking-wide">אזל מהמלאי</p>
+
+                ) : isIncluded && iceCreamExhausted && !inCart ? (
+                  /* ── Included ice cream exhausted — can't add ── */
+                  <p className="text-center text-sm text-caramel-400 py-1 tracking-wide">אין גלידה זמינה</p>
 
                 ) : !inCart ? (
                   /* ── Add button ── */
@@ -151,6 +191,21 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl }:
                     <span className="relative z-10">הוספה להזמנה</span>
                     <span className="absolute inset-0 bg-gradient-to-l from-transparent via-white/10 to-transparent animate-shimmer" />
                   </button>
+
+                ) : isIncluded && iceCreamExhausted ? (
+                  /* ── Included ice cream exhausted — in cart already, disable stepper ── */
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Stepper
+                        value={simpleQty}
+                        onDec={() => decSimple(item)}
+                        onInc={() => incSimple(item)}
+                        disableInc={true}
+                        large
+                      />
+                    </div>
+                    <p className="text-xs text-center text-caramel-400">אין גלידה זמינה</p>
+                  </div>
 
                 ) : isOptional ? (
                   /* ── Optional: total stepper + ice cream sub-stepper ── */
@@ -177,7 +232,7 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl }:
                         value={ci.quantityWithIceCream}
                         onDec={() => decIceCream(item)}
                         onInc={() => incIceCream(item)}
-                        disableInc={ci.quantityWithoutIceCream === 0}
+                        disableInc={ci.quantityWithoutIceCream === 0 || iceCreamExhausted}
                       />
                     </div>
                   </div>
