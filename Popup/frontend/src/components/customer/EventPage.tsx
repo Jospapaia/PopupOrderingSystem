@@ -129,9 +129,8 @@ export default function EventPage({ event }: Props) {
         </div>
 
         <div className="relative z-10 text-center px-6 pt-8 pb-7">
-          {/* Logo placeholder */}
-          <div className="w-14 h-14 mx-auto mb-4 rounded-full border border-gold/50 bg-gold/10 flex items-center justify-center shadow-lg">
-            <span className="text-2xl leading-none">🍦</span>
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full overflow-hidden bg-white shadow-lg">
+            <img src="/logo.png" alt="לוגו" className="w-full h-full object-contain p-1" />
           </div>
 
           {/* Event title – big Frank Ruhl Libre */}

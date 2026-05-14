@@ -51,8 +51,8 @@ export default function CustomerApp() {
     return (
       <div className="min-h-screen flex items-center justify-center p-5" dir="rtl">
         <div className="text-center max-w-xs animate-fade-in">
-          <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-caramel-100 flex items-center justify-center">
-            <span className="text-4xl">🍨</span>
+          <div className="w-24 h-24 mx-auto mb-5 rounded-full overflow-hidden bg-white shadow-sm">
+            <img src="/logo.png" alt="לוגו" className="w-full h-full object-contain p-1.5" />
           </div>
           <h2 className="font-display font-bold text-2xl text-chocolate">אין אירוע קרוב</h2>
         </div>
