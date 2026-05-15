@@ -62,6 +62,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    logger.warning("Validation error on %s %s: %s", request.method, request.url.path, exc.errors())
     return JSONResponse(
         status_code=422,
         content={"detail": "שגיאה בנתוני הבקשה — אנא בדוק את הקלט ונסה שוב"},
