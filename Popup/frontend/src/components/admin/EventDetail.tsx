@@ -297,7 +297,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
               <div className={lockedFields ? "col-span-2" : ""}>
                 <label className="block text-xs font-semibold text-caramel-500 mb-1">מקסימום מנות גלידה לסלוט</label>
                 <input type="number" min="1" value={editForm.max_ice_cream_per_slot ?? ""}
-                  onChange={(e) => setEditForm({ ...editForm, max_ice_cream_per_slot: e.target.valueAsNumber })}
+                  onChange={(e) => { const v = e.target.valueAsNumber; if (!isNaN(v)) setEditForm({ ...editForm, max_ice_cream_per_slot: v }); }}
                   className={inputCls} />
               </div>
               <div className={lockedFields ? "col-span-2" : ""}>
@@ -326,7 +326,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                     onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
                     className={highlightPublishError ? inputErrorCls : inputCls} />
                   <input type="number" min="1" value={editForm.slot_duration_min ?? ""} placeholder="משך סלוט (דקות)"
-                    onChange={(e) => setEditForm({ ...editForm, slot_duration_min: e.target.valueAsNumber })}
+                    onChange={(e) => { const v = e.target.valueAsNumber; if (!isNaN(v)) setEditForm({ ...editForm, slot_duration_min: v }); }}
                     className={highlightPublishError ? inputErrorCls : inputCls} />
                 </>
               )}
