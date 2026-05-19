@@ -250,6 +250,19 @@ class OrderOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── About Page ───────────────────────────────────────────────────────────────
+
+class AboutPageOut(BaseModel):
+    bio_text: Optional[str] = None
+    image_url: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AboutPageUpdate(BaseModel):
+    bio_text: Optional[str] = None
+
+
 # ── Public Event Response ─────────────────────────────────────────────────────
 
 class UpcomingEventOut(BaseModel):

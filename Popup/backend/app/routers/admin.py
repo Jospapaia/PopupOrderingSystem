@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..auth import require_admin
 from ..models.models import (
-    Event, Slot, EventMenuItem, Order, OrderItem, Product,
+    Event, Slot, EventMenuItem, Order, OrderItem, Product, AboutPage,
     EventStatus, OrderStatus, IceCreamMode,
 )
 from ..queries import booked_portions, item_booked, effective_max_ice_cream
@@ -25,7 +25,7 @@ from ..schemas import (
     EventCreate, EventUpdate, EventOut,
     SlotUpdate, SlotAdminOut, OrderSummary, OrderItemSummary,
     EventMenuItemCreate, EventMenuItemUpdate, EventMenuItemOut,
-    OrderOut,
+    OrderOut, AboutPageOut, AboutPageUpdate,
 )
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
@@ -127,6 +127,51 @@ def _generate_slot_objects(
 
 def _requires_lock_check(update_data: dict) -> bool:
     return bool(_LOCKED_FIELDS.intersection(update_data.keys()))
+
+
+# ── About Page ────────────────────────────────────────────────────────────────
+
+@router.get("/about", response_model=AboutPageOut)
+def get_about(db: Session = Depends(get_db)) -> AboutPageOut:
+    about = db.get(AboutPage, 1)
+    return about or AboutPageOut()
+
+
+@router.patch("/about", response_model=AboutPageOut)
+def update_about(payload: AboutPageUpdate, db: Session = Depends(get_db)) -> AboutPageOut:
+    about = db.get(AboutPage, 1)
+    if about is None:
+        about = AboutPage(id=1)
+        db.add(about)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(about, field, value)
+    db.commit()
+    db.refresh(about)
+    return about
+
+
+@router.post("/about/image", response_model=AboutPageOut)
+async def upload_about_image(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> AboutPageOut:
+    allowed_types = {"image/jpeg", "image/png"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=422, detail="סוג הקובץ אינו נתמך — יש להעלות JPEG או PNG")
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=422, detail="גודל הקובץ חורג מ-5MB")
+    ext = "jpg" if file.content_type == "image/jpeg" else "png"
+    dest = STATIC_UPLOADS / f"about.{ext}"
+    dest.write_bytes(content)
+    about = db.get(AboutPage, 1)
+    if about is None:
+        about = AboutPage(id=1)
+        db.add(about)
+    about.image_url = f"/static/uploads/about.{ext}"
+    db.commit()
+    db.refresh(about)
+    return about
 
 
 # ── Products ──────────────────────────────────────────────────────────────────

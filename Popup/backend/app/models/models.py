@@ -139,6 +139,14 @@ class Order(Base):
     )
 
 
+class AboutPage(Base):
+    __tablename__ = "about_page"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bio_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
 class OrderItem(Base):
     __tablename__ = "order_items"
 

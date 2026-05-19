@@ -3,8 +3,9 @@ import { registerUnauthorizedHandler, clearAdminAuth, hasStoredAdminSession } fr
 import PasswordGate from "./PasswordGate";
 import EventList from "./EventList";
 import ProductList from "./ProductList";
+import AboutEditor from "./AboutEditor";
 
-type AdminView = "events" | "products";
+type AdminView = "events" | "products" | "about";
 
 export default function AdminApp() {
   const [authed, setAuthed] = useState(hasStoredAdminSession());
@@ -48,6 +49,16 @@ export default function AdminApp() {
             >
               מוצרים
             </button>
+            <button
+              onClick={() => setView("about")}
+              className={`text-sm px-3 py-1.5 rounded-xl font-medium transition-colors ${
+                view === "about"
+                  ? "bg-gold text-chocolate"
+                  : "text-caramel-300 hover:text-cream"
+              }`}
+            >
+              אודות
+            </button>
           </div>
         </div>
         <button
@@ -61,7 +72,7 @@ export default function AdminApp() {
         </button>
       </header>
       <main className="max-w-4xl mx-auto p-4 py-6">
-        {view === "events" ? <EventList /> : <ProductList />}
+        {view === "events" ? <EventList /> : view === "products" ? <ProductList /> : <AboutEditor />}
       </main>
     </div>
   );

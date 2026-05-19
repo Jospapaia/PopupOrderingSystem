@@ -4,6 +4,7 @@ import type {
   EventCreatePayload, EventUpdatePayload,
   ProductCreatePayload, ProductUpdatePayload,
   MenuItemCreatePayload, MenuItemUpdatePayload,
+  AboutPageOut, AboutPageUpdatePayload,
 } from "./types";
 
 export const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -181,3 +182,19 @@ export const adminPickupOrder = (orderId: string): Promise<OrderOut> =>
 
 export const adminCancelOrder = (orderId: string): Promise<OrderOut> =>
   request<OrderOut>(`/admin/orders/${orderId}/cancel`, { method: "POST" }, true);
+
+// About page
+export const getAbout = (): Promise<AboutPageOut> =>
+  request<AboutPageOut>("/about");
+
+export const adminGetAbout = (): Promise<AboutPageOut> =>
+  request<AboutPageOut>("/admin/about", {}, true);
+
+export const adminUpdateAbout = (data: AboutPageUpdatePayload): Promise<AboutPageOut> =>
+  request<AboutPageOut>("/admin/about", { method: "PATCH", body: JSON.stringify(data) }, true);
+
+export const adminUploadAboutImage = (file: File): Promise<AboutPageOut> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return request<AboutPageOut>("/admin/about/image", { method: "POST", body: formData }, true);
+};

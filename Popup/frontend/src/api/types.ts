@@ -176,6 +176,15 @@ export interface ProductUpdatePayload {
   image_url?: string | null;
 }
 
+export interface AboutPageOut {
+  bio_text: string | null;
+  image_url: string | null;
+}
+
+export interface AboutPageUpdatePayload {
+  bio_text?: string | null;
+}
+
 export interface MenuItemCreatePayload {
   product_id: string;
   quantity_available: number;

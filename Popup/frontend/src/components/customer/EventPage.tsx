@@ -1,10 +1,10 @@
-import { useState } from "react";
-import type { UpcomingEvent, OrderOut, CartItem } from "../../api/types";
+import { useState, useEffect } from "react";
+import type { UpcomingEvent, OrderOut, CartItem, AboutPageOut } from "../../api/types";
 import ItemList from "./ItemList";
 import SlotPicker from "./SlotPicker";
 import OrderForm from "./OrderForm";
 import Confirmation from "./Confirmation";
-import { createOrder, getUpcomingEvent, BASE, toApiError } from "../../api/client";
+import { createOrder, getUpcomingEvent, getAbout, BASE, toApiError } from "../../api/client";
 import { formatDate, formatTimeRange } from "../../utils/format";
 import { needsSlotForCart, cartIceCreamPortions, cartItemQuantity } from "../../utils/cart";
 
@@ -18,11 +18,14 @@ export default function EventPage({ event }: Props) {
   const [cart, setCart]                 = useState<CartItem[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [error, setError]               = useState<string | null>(null);
-  const [descExpanded, setDescExpanded] = useState(false);
-  const descIsLong = (event.description?.length ?? 0) > 180;
   const [order, setOrder]               = useState<OrderOut | null>(null);
   const [fullSlots, setFullSlots]       = useState<Set<string>>(new Set());
   const [eventSlots, setEventSlots]     = useState(event.slots);
+  const [about, setAbout]               = useState<AboutPageOut | null>(null);
+
+  useEffect(() => {
+    getAbout().then(setAbout).catch(() => {});
+  }, []);
 
   const needsSlot = needsSlotForCart(cart);
 
@@ -148,6 +151,15 @@ export default function EventPage({ event }: Props) {
           <p className="text-caramel-300 text-sm tracking-wide">
             {formatDate(event.date)} · {formatTimeRange(event.start_time, event.end_time)}
           </p>
+
+          {about?.bio_text && (
+            <a
+              href="/about"
+              className="inline-block mt-3 text-xs text-caramel-400 hover:text-cream transition-colors border border-caramel-600/40 hover:border-caramel-400 rounded-full px-3 py-1"
+            >
+              קצת עלי ›
+            </a>
+          )}
         </div>
       </header>
 
@@ -164,27 +176,14 @@ export default function EventPage({ event }: Props) {
             </div>
 
             {/* box */}
-            <div className="relative bg-white/80 border border-caramel-200/70 rounded-2xl px-5 py-4 text-center shadow-sm overflow-hidden">
+            <div className="relative bg-white/80 border border-caramel-200/70 rounded-2xl px-5 py-4 text-center shadow-sm">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
-              <p className={`text-sm text-caramel-700 leading-relaxed ${!descExpanded && descIsLong ? "line-clamp-3" : ""}`}>
+              <p className="text-sm text-caramel-700 leading-relaxed">
                 {event.description?.split(/\n|<br\s*\/?>/i).map((part, i, arr) => (
                   <span key={i}>{part}{i < arr.length - 1 && <br />}</span>
                 ))}
               </p>
-              {!descExpanded && descIsLong && (
-                <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-white/90 to-transparent pointer-events-none" />
-              )}
             </div>
-
-            {/* toggle */}
-            {descIsLong && (
-              <button
-                onClick={() => setDescExpanded((v) => !v)}
-                className="w-full text-center text-xs text-caramel-400 mt-2 py-0.5 hover:text-chocolate transition-colors"
-              >
-                {descExpanded ? "סגירה ↑" : "קריאה נוספת ↓"}
-              </button>
-            )}
 
             {/* ornamental rule */}
             <div className="flex items-center gap-3 mt-3">

@@ -10,13 +10,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models.models import (
-    Event, Slot, EventMenuItem, Order, OrderItem, Product,
+    Event, Slot, EventMenuItem, Order, OrderItem, Product, AboutPage,
     EventStatus, OrderStatus, IceCreamMode,
 )
 from ..queries import booked_portions, item_booked, effective_max_ice_cream, ice_cream_count_for_item
 from ..schemas import (
     OrderCreate, OrderOut, OrderItemIn, UpcomingEventResponse, UpcomingEventOut,
-    SlotPublicOut, EventMenuItemPublicOut,
+    SlotPublicOut, EventMenuItemPublicOut, AboutPageOut,
 )
 
 router = APIRouter()
@@ -240,6 +240,12 @@ def _create_order(db: Session, payload: OrderCreate, now: datetime) -> OrderOut:
         .where(Order.id == order.id)
     ).scalar_one()
     return loaded
+
+
+@router.get("/about", response_model=AboutPageOut)
+def get_about(db: Session = Depends(get_db)) -> AboutPageOut:
+    about = db.get(AboutPage, 1)
+    return about or AboutPageOut()
 
 
 @router.post("/orders", response_model=OrderOut, status_code=201)
