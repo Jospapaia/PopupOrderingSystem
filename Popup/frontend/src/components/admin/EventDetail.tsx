@@ -4,7 +4,7 @@ import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCre
 import {
   adminPublishEvent, adminCompleteEvent, adminCancelEvent, adminDeleteEvent,
   adminListMenuItems, adminAddMenuItem, adminUpdateMenuItem, adminDeleteMenuItem,
-  adminListProducts, adminCreateProduct, adminUpdateEvent, adminListOrders,
+  adminReorderMenuItems, adminListProducts, adminCreateProduct, adminUpdateEvent, adminListOrders,
   adminPickupOrder, adminCancelOrder, toApiError,
 } from "../../api/client";
 import SlotGrid from "./SlotGrid";
@@ -47,6 +47,8 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
   const [editingQtyValue, setEditingQtyValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const loadMenu = () =>
     adminListMenuItems(event.id).then(setMenuItems).catch((e: unknown) => setError(toApiError(e).message));
@@ -204,6 +206,24 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       loadSlotlessOrders();
     } catch (err: unknown) {
       setError(toApiError(err).message);
+    }
+  };
+
+  const handleDrop = async (targetIdx: number) => {
+    if (dragSrcIdx === null || dragSrcIdx === targetIdx) {
+      setDragSrcIdx(null); setDragOverIdx(null);
+      return;
+    }
+    const reordered = [...menuItems];
+    const [moved] = reordered.splice(dragSrcIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+    setMenuItems(reordered);
+    setDragSrcIdx(null); setDragOverIdx(null);
+    try {
+      await adminReorderMenuItems(event.id, reordered.map((i) => i.id));
+    } catch (err: unknown) {
+      setError(toApiError(err).message);
+      loadMenu();
     }
   };
 
@@ -390,18 +410,38 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
           )}
 
           <div className="space-y-2">
-            {menuItems.map((item) => (
-              <div key={item.id}
-                className={`bg-white border border-caramel-100 rounded-2xl shadow-card p-3 text-sm ${!item.is_active ? "opacity-60" : ""}`}>
+            {menuItems.map((item, idx) => (
+              <div
+                key={item.id}
+                draggable
+                onDragStart={() => setDragSrcIdx(idx)}
+                onDragOver={(e) => { e.preventDefault(); setDragOverIdx(idx); }}
+                onDragLeave={() => setDragOverIdx(null)}
+                onDrop={() => void handleDrop(idx)}
+                onDragEnd={() => { setDragSrcIdx(null); setDragOverIdx(null); }}
+                className={`bg-white border rounded-2xl shadow-card p-3 text-sm transition-colors select-none
+                  ${!item.is_active ? "opacity-60" : ""}
+                  ${dragOverIdx === idx && dragSrcIdx !== idx ? "border-caramel-400 bg-caramel-50" : "border-caramel-100"}
+                  ${dragSrcIdx === idx ? "opacity-50" : ""}
+                `}
+              >
                 <div className="flex justify-between items-center">
-                  <div>
-                    <span className="font-semibold text-chocolate">{item.product_name}</span>
-                    <span className="text-caramel-500 mr-2">₪{item.price.toFixed(2)}</span>
-                    {item.ice_cream_addon_price !== null && (
-                      <span className="text-caramel-400 text-xs">+₪{item.ice_cream_addon_price.toFixed(2)} גלידה</span>
-                    )}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="text-caramel-300 cursor-grab active:cursor-grabbing text-lg leading-none shrink-0"
+                      title="גרור לסידור מחדש"
+                    >
+                      ⠿
+                    </span>
+                    <div>
+                      <span className="font-semibold text-chocolate">{item.product_name}</span>
+                      <span className="text-caramel-500 mr-2">₪{item.price.toFixed(2)}</span>
+                      {item.ice_cream_addon_price !== null && (
+                        <span className="text-caramel-400 text-xs">+₪{item.ice_cream_addon_price.toFixed(2)} גלידה</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-1.5 shrink-0">
                     <button onClick={() => handleToggleActive(item.id, item.is_active)}
                       className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
                         item.is_active
@@ -418,7 +458,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                 </div>
 
                 {/* Quantity row */}
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex items-center gap-2 pr-7">
                   {editingQtyId === item.id ? (
                     <>
                       <input

@@ -133,6 +133,7 @@ export interface EventMenuItemOut {
   price: number;
   ice_cream_addon_price: number | null;
   is_active: boolean;
+  sort_order: number;
 }
 
 // Cart item used across customer order flow

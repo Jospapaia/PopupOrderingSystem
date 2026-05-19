@@ -175,8 +175,13 @@ class EventMenuItemOut(BaseModel):
     price: DecimalAsFloat
     ice_cream_addon_price: Optional[DecimalAsFloat]
     is_active: bool
+    sort_order: int
 
     model_config = {"from_attributes": True}
+
+
+class MenuItemReorderPayload(BaseModel):
+    order: list[uuid.UUID]
 
 
 class EventMenuItemPublicOut(BaseModel):

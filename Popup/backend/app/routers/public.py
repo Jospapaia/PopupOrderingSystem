@@ -82,6 +82,7 @@ def _get_upcoming_event_data(db: Session, today: date) -> UpcomingEventResponse:
             EventMenuItem.event_id == event.id,
             EventMenuItem.is_active == True,
         )
+        .order_by(EventMenuItem.sort_order)
     ).scalars().all()
 
     slots_out: List[SlotPublicOut] = []

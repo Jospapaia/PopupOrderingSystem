@@ -24,7 +24,7 @@ from ..schemas import (
     ProductCreate, ProductUpdate, ProductOut,
     EventCreate, EventUpdate, EventOut,
     SlotUpdate, SlotAdminOut, OrderSummary, OrderItemSummary,
-    EventMenuItemCreate, EventMenuItemUpdate, EventMenuItemOut,
+    EventMenuItemCreate, EventMenuItemUpdate, EventMenuItemOut, MenuItemReorderPayload,
     OrderOut, AboutPageOut, AboutPageUpdate,
 )
 
@@ -50,6 +50,7 @@ def _build_menu_item_out(item: EventMenuItem) -> EventMenuItemOut:
         price=item.price,
         ice_cream_addon_price=item.ice_cream_addon_price,
         is_active=item.is_active,
+        sort_order=item.sort_order,
     )
 
 
@@ -419,8 +420,20 @@ def list_menu_items(event_id: uuid.UUID, db: Session = Depends(get_db)) -> List[
         select(EventMenuItem)
         .options(selectinload(EventMenuItem.product))
         .where(EventMenuItem.event_id == event_id)
+        .order_by(EventMenuItem.sort_order)
     ).scalars().all()
     return [_build_menu_item_out(item) for item in items]
+
+
+@router.put("/events/{event_id}/menu/reorder", status_code=204, response_model=None)
+def reorder_menu_items(event_id: uuid.UUID, payload: MenuItemReorderPayload, db: Session = Depends(get_db)) -> None:
+    for idx, item_id in enumerate(payload.order):
+        item = db.execute(
+            select(EventMenuItem).where(EventMenuItem.id == item_id, EventMenuItem.event_id == event_id)
+        ).scalar_one_or_none()
+        if item is not None:
+            item.sort_order = idx
+    db.commit()
 
 
 @router.post("/events/{event_id}/menu", response_model=EventMenuItemOut, status_code=201)
@@ -431,7 +444,11 @@ def add_menu_item(event_id: uuid.UUID, payload: EventMenuItemCreate, db: Session
     product = db.get(Product, payload.product_id)
     if product is None:
         raise HTTPException(status_code=404, detail="המוצר לא נמצא")
-    item = EventMenuItem(event_id=event_id, **payload.model_dump())
+    max_sort: int = db.execute(
+        select(func.coalesce(func.max(EventMenuItem.sort_order), -1))
+        .where(EventMenuItem.event_id == event_id)
+    ).scalar_one()
+    item = EventMenuItem(event_id=event_id, sort_order=max_sort + 1, **payload.model_dump())
     db.add(item)
     try:
         db.commit()

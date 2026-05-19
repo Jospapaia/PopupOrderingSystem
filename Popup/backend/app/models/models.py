@@ -104,6 +104,7 @@ class EventMenuItem(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     ice_cream_addon_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     event = relationship("Event", back_populates="menu_items")
     product = relationship("Product", back_populates="event_menu_items")

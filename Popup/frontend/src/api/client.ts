@@ -173,6 +173,9 @@ export const adminUpdateMenuItem = (itemId: string, data: MenuItemUpdatePayload)
 export const adminDeleteMenuItem = (itemId: string): Promise<void> =>
   request<void>(`/admin/menu-items/${itemId}`, { method: "DELETE" }, true);
 
+export const adminReorderMenuItems = (eventId: string, order: string[]): Promise<void> =>
+  request<void>(`/admin/events/${eventId}/menu/reorder`, { method: "PUT", body: JSON.stringify({ order }) }, true);
+
 // Admin — Orders
 export const adminListOrders = (eventId: string): Promise<OrderOut[]> =>
   request<OrderOut[]>(`/admin/events/${eventId}/orders`, {}, true);
