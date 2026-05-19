@@ -530,6 +530,27 @@ def pickup_order(order_id: uuid.UUID, db: Session = Depends(get_db)) -> OrderOut
     return order
 
 
+@router.delete("/order-items/{item_id}", response_model=OrderOut)
+def remove_order_item(item_id: uuid.UUID, db: Session = Depends(get_db)) -> OrderOut:
+    oi = db.get(OrderItem, item_id)
+    if oi is None:
+        raise HTTPException(status_code=404, detail="פריט ההזמנה לא נמצא")
+    order = _load_order_with_products(db, oi.order_id)
+    if order is None or order.status == OrderStatus.cancelled:
+        raise HTTPException(status_code=409, detail="ההזמנה כבר בוטלה")
+    if order.status == OrderStatus.picked_up:
+        raise HTTPException(status_code=409, detail="לא ניתן לשנות הזמנה שנאספה")
+    db.delete(oi)
+    db.flush()
+    remaining = db.execute(
+        select(func.count(OrderItem.id)).where(OrderItem.order_id == order.id)
+    ).scalar_one()
+    if remaining == 0:
+        order.status = OrderStatus.cancelled
+    db.commit()
+    return _load_order_with_products(db, order.id)  # type: ignore[return-value]
+
+
 @router.post("/orders/{order_id}/cancel", response_model=OrderOut)
 def cancel_order(order_id: uuid.UUID, db: Session = Depends(get_db)) -> OrderOut:
     order = _load_order_with_products(db, order_id)

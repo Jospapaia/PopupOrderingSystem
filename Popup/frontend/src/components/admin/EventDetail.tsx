@@ -1,11 +1,11 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, useMemo, type FormEvent } from "react";
 import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut } from "../../api/types";
 // IceCreamMode is still needed for AddMenuItemPanel's newProduct state
 import {
   adminPublishEvent, adminCompleteEvent, adminCancelEvent, adminDeleteEvent,
   adminListMenuItems, adminAddMenuItem, adminUpdateMenuItem, adminDeleteMenuItem,
   adminReorderMenuItems, adminListProducts, adminCreateProduct, adminUpdateEvent, adminListOrders,
-  adminPickupOrder, adminCancelOrder, toApiError,
+  adminPickupOrder, adminCancelOrder, adminRemoveOrderItem, toApiError,
 } from "../../api/client";
 import SlotGrid from "./SlotGrid";
 import { STATUS_LABELS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ICE_CREAM_MODES, ICE_CREAM_MODE_LABELS } from "../../utils/eventStatus";
@@ -38,11 +38,13 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [menuItems, setMenuItems] = useState<EventMenuItemOut[]>([]);
   const [products, setProducts] = useState<ProductOut[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"menu" | "slots">("menu");
+  const [tab, setTab] = useState<"menu" | "slots" | "orders">("menu");
   const [editForm, setEditForm] = useState<Partial<EventEditForm>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [slotlessOrders, setSlotlessOrders] = useState<OrderOut[]>([]);
+  const [allOrders, setAllOrders] = useState<OrderOut[]>([]);
+  const [ordersView, setOrdersView] = useState<"by-order" | "by-product">("by-order");
   const [highlightPublishError, setHighlightPublishError] = useState(false);
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
   const [editingQtyValue, setEditingQtyValue] = useState("");
@@ -56,12 +58,15 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const loadProducts = () =>
     adminListProducts().then(setProducts).catch((e: unknown) => setError(toApiError(e).message));
 
-  const loadSlotlessOrders = () =>
+  const loadOrders = () =>
     adminListOrders(event.id)
-      .then((orders) => setSlotlessOrders(orders.filter((o) => o.slot_id === null)))
+      .then((orders) => {
+        setAllOrders(orders);
+        setSlotlessOrders(orders.filter((o) => o.slot_id === null));
+      })
       .catch((e: unknown) => setError(toApiError(e).message));
 
-  useEffect(() => { loadMenu(); loadProducts(); loadSlotlessOrders(); }, [event.id]);
+  useEffect(() => { loadMenu(); loadProducts(); loadOrders(); }, [event.id]);
 
   const startEditing = () => {
     setEditForm({
@@ -193,7 +198,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
     if (!window.confirm("לאשר איסוף? פעולה זו אינה ניתנת לביטול.")) return;
     try {
       await adminPickupOrder(orderId);
-      loadSlotlessOrders();
+      loadOrders();
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
@@ -203,7 +208,29 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
     if (!window.confirm("לבטל הזמנה זו?")) return;
     try {
       await adminCancelOrder(orderId);
-      loadSlotlessOrders();
+      loadOrders();
+    } catch (err: unknown) {
+      setError(toApiError(err).message);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!window.confirm("לבטל הזמנה זו?")) return;
+    try {
+      const updated = await adminCancelOrder(orderId);
+      setAllOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      setSlotlessOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+    } catch (err: unknown) {
+      setError(toApiError(err).message);
+    }
+  };
+
+  const handleRemoveItem = (orderId: string, itemId: string, productName: string) => async () => {
+    if (!window.confirm(`להסיר "${productName}" מההזמנה?`)) return;
+    try {
+      const updated = await adminRemoveOrderItem(itemId);
+      setAllOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+      setSlotlessOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
@@ -228,6 +255,26 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   };
 
   const lockedFields = event.status !== "draft";
+
+  const productStats = useMemo(() => {
+    const orderedQty: Record<string, number> = {};
+    const buyers: Record<string, { customerName: string; qty: number; withIceCream: number }[]> = {};
+    for (const order of allOrders) {
+      if (order.status === "cancelled") continue;
+      const byItem: Record<string, { qty: number; withIceCream: number }> = {};
+      for (const oi of order.items) {
+        if (!byItem[oi.event_menu_item_id]) byItem[oi.event_menu_item_id] = { qty: 0, withIceCream: 0 };
+        byItem[oi.event_menu_item_id].qty += oi.quantity;
+        if (oi.with_ice_cream) byItem[oi.event_menu_item_id].withIceCream += oi.quantity;
+      }
+      for (const [emiId, data] of Object.entries(byItem)) {
+        orderedQty[emiId] = (orderedQty[emiId] ?? 0) + data.qty;
+        if (!buyers[emiId]) buyers[emiId] = [];
+        buyers[emiId].push({ customerName: order.customer_name, qty: data.qty, withIceCream: data.withIceCream });
+      }
+    }
+    return { orderedQty, buyers };
+  }, [allOrders]);
 
   return (
     <div>
@@ -385,7 +432,13 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
           className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
             tab === "slots" ? "bg-chocolate text-cream" : "bg-white border border-caramel-200 text-chocolate hover:bg-caramel-50"
           }`}>
-          סלוטים והזמנות
+          סלוטים
+        </button>
+        <button onClick={() => setTab("orders")}
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+            tab === "orders" ? "bg-chocolate text-cream" : "bg-white border border-caramel-200 text-chocolate hover:bg-caramel-50"
+          }`}>
+          הזמנות {allOrders.filter(o => o.status !== "cancelled").length > 0 && `(${allOrders.filter(o => o.status !== "cancelled").length})`}
         </button>
       </div>
 
@@ -541,6 +594,130 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
             </div>
           )}
         </>
+      )}
+
+      {/* Orders tab */}
+      {tab === "orders" && (
+        <div>
+          {/* View toggle */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setOrdersView("by-order")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                ordersView === "by-order" ? "bg-caramel-500 text-white" : "bg-white border border-caramel-200 text-chocolate hover:bg-caramel-50"
+              }`}
+            >
+              לפי הזמנה
+            </button>
+            <button
+              onClick={() => setOrdersView("by-product")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                ordersView === "by-product" ? "bg-caramel-500 text-white" : "bg-white border border-caramel-200 text-chocolate hover:bg-caramel-50"
+              }`}
+            >
+              לפי מוצר
+            </button>
+          </div>
+
+          {ordersView === "by-order" && (
+            <div className="space-y-2">
+              {allOrders.length === 0 && (
+                <p className="text-center text-caramel-400 text-sm py-8">אין הזמנות עדיין</p>
+              )}
+              {[...allOrders]
+                .sort((a, b) => a.created_at.localeCompare(b.created_at))
+                .map((order, idx) => (
+                  <div
+                    key={order.id}
+                    className={`bg-white border border-caramel-100 rounded-2xl shadow-card p-3 text-sm ${order.status === "cancelled" ? "opacity-50" : ""}`}
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-chocolate text-xs bg-caramel-100 rounded-full w-6 h-6 flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="font-semibold text-chocolate">{order.customer_name}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
+                          {ORDER_STATUS_LABELS[order.status]}
+                        </span>
+                        <span className="text-xs text-caramel-400">{formatTime(order.created_at)}</span>
+                      </div>
+                      {order.status === "confirmed" && (
+                        <button
+                          onClick={() => void handleCancelOrder(order.id)}
+                          className="text-xs bg-red-50 border border-red-100 text-red-600 px-2 py-1 rounded-lg font-medium hover:bg-red-100 transition-colors shrink-0"
+                        >
+                          בטל הזמנה
+                        </button>
+                      )}
+                    </div>
+                    <div className="mt-2 space-y-1 pr-8">
+                      {order.items.map((oi) => (
+                        <div key={oi.id} className="flex items-center justify-between gap-2">
+                          <span className="text-caramel-700">
+                            {oi.product_name} ×{oi.quantity}
+                            {oi.with_ice_cream === true && <span className="text-caramel-400 text-xs"> (עם גלידה)</span>}
+                            {oi.with_ice_cream === false && <span className="text-caramel-400 text-xs"> (ללא גלידה)</span>}
+                          </span>
+                          {order.status === "confirmed" && (
+                            <button
+                              onClick={handleRemoveItem(order.id, oi.id, oi.product_name)}
+                              className="text-xs text-red-400 hover:text-red-600 transition-colors font-medium leading-none"
+                              title="הסר פריט"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {order.notes && (
+                      <p className="text-xs text-amber-600 mt-1.5 pr-8">הערה: {order.notes}</p>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {ordersView === "by-product" && (
+            <div className="space-y-3">
+              {menuItems.length === 0 && (
+                <p className="text-center text-caramel-400 text-sm py-8">אין פריטים בתפריט</p>
+              )}
+              {menuItems.map((item) => {
+                const ordered = productStats.orderedQty[item.id] ?? 0;
+                const remaining = item.quantity_available - ordered;
+                const buyers = productStats.buyers[item.id] ?? [];
+                return (
+                  <div key={item.id} className="bg-white border border-caramel-100 rounded-2xl shadow-card p-3 text-sm">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-semibold text-chocolate">{item.product_name}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${remaining <= 0 ? "bg-red-100 text-red-600" : remaining <= 3 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                        נשארו {remaining} / {item.quantity_available}
+                      </span>
+                    </div>
+                    {buyers.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {buyers.map((b, i) => (
+                          <div key={i} className="text-xs text-caramel-600 flex items-center gap-1">
+                            <span className="text-caramel-300">·</span>
+                            <span>{b.customerName}</span>
+                            <span className="text-caramel-400">×{b.qty}</span>
+                            {b.withIceCream > 0 && b.withIceCream < b.qty && (
+                              <span className="text-caramel-400">({b.withIceCream} עם גלידה)</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-caramel-400">אין הזמנות</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

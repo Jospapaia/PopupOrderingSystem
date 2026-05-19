@@ -186,6 +186,9 @@ export const adminPickupOrder = (orderId: string): Promise<OrderOut> =>
 export const adminCancelOrder = (orderId: string): Promise<OrderOut> =>
   request<OrderOut>(`/admin/orders/${orderId}/cancel`, { method: "POST" }, true);
 
+export const adminRemoveOrderItem = (itemId: string): Promise<OrderOut> =>
+  request<OrderOut>(`/admin/order-items/${itemId}`, { method: "DELETE" }, true);
+
 // About page
 export const getAbout = (): Promise<AboutPageOut> =>
   request<AboutPageOut>("/about");
