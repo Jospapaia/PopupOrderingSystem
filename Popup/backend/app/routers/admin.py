@@ -96,6 +96,7 @@ def _build_slot_admin_out(db: Session, slot: Slot, event: Event) -> SlotAdminOut
                     quantity=oi.quantity,
                     unit_price=oi.unit_price,
                     with_ice_cream=oi.with_ice_cream,
+                    used_ice_cream=oi.used_ice_cream,
                 )
                 for oi in o.items
             ],

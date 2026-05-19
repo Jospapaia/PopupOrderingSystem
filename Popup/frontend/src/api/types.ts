@@ -102,6 +102,7 @@ export interface OrderItemSummary {
   quantity: number;
   unit_price: number;
   with_ice_cream: boolean | null;
+  used_ice_cream: boolean;
 }
 
 export interface OrderSummary {

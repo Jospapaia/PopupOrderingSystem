@@ -111,6 +111,7 @@ class OrderItemSummary(BaseModel):
     quantity: int
     unit_price: DecimalAsFloat
     with_ice_cream: Optional[bool]
+    used_ice_cream: bool
 
     model_config = {"from_attributes": True}
 

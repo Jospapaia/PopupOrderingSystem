@@ -176,9 +176,10 @@ function OrderRow({
           {ORDER_STATUS_LABELS[order.status]}
         </span>
         <div className="text-xs text-caramel-400 mt-0.5">
-          {order.items.map((oi) =>
-            `${oi.product_name}×${oi.quantity}${oi.with_ice_cream ? "+גלידה" : ""}`
-          ).join(", ")}
+          {order.items
+            .filter((oi) => oi.used_ice_cream)
+            .map((oi) => `${oi.product_name}×${oi.quantity}`)
+            .join(", ")}
         </div>
         {order.notes && <div className="text-xs text-amber-600 mt-0.5">הערה: {order.notes}</div>}
       </div>
