@@ -62,17 +62,22 @@ export default function SlotPicker({ slots, extraFullSlots, selectedSlotId, iceC
               {isPast && !isFull && <div className="text-xs font-medium">עבר</div>}
 
               {!isPast && (
-                <div className="flex gap-1 justify-center mt-2 flex-wrap">
-                  {Array.from({ length: slot.max_ice_cream_effective }, (_, i) => (
+                <div className="mt-2.5 space-y-1">
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isSelected ? "bg-white/20" : "bg-caramel-100"}`}>
                     <div
-                      key={i}
-                      className={`w-3 h-3 rounded-sm ${
-                        i < slot.booked_portions
-                          ? isSelected ? "bg-red-400/80" : "bg-red-400"
-                          : isSelected ? "bg-green-400/80" : "bg-green-400"
+                      className={`h-full rounded-full transition-all ${
+                        slot.booked_portions >= slot.max_ice_cream_effective
+                          ? "bg-red-400"
+                          : slot.booked_portions / slot.max_ice_cream_effective >= 0.75
+                          ? isSelected ? "bg-amber-300" : "bg-amber-400"
+                          : isSelected ? "bg-green-300" : "bg-green-400"
                       }`}
+                      style={{ width: `${Math.min(100, (slot.booked_portions / slot.max_ice_cream_effective) * 100)}%` }}
                     />
-                  ))}
+                  </div>
+                  <p className={`text-[10px] font-medium tabular-nums ${isSelected ? "text-cream/70" : "text-caramel-400"}`}>
+                    {slot.max_ice_cream_effective - slot.booked_portions} מנות גלידה פנויות
+                  </p>
                 </div>
               )}
 
