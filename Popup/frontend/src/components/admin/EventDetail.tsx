@@ -53,6 +53,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingQtys, setEditingQtys] = useState<Record<string, number>>({});
+  const [slotRefreshKey, setSlotRefreshKey] = useState(0);
 
   const loadMenu = () =>
     adminListMenuItems(event.id).then(setMenuItems).catch((e: unknown) => setError(toApiError(e).message));
@@ -223,6 +224,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       setAllOrders((prev) => prev.filter((o) => o.id !== orderId));
       setSlotlessOrders((prev) => prev.filter((o) => o.id !== orderId));
       if (editingOrderId === orderId) setEditingOrderId(null);
+      setSlotRefreshKey((k) => k + 1);
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
@@ -256,6 +258,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
         setSlotlessOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder! : o)));
       }
       setEditingOrderId(null);
+      setSlotRefreshKey((k) => k + 1);
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
@@ -578,7 +581,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       {/* Slots tab */}
       {tab === "slots" && (
         <>
-          <SlotGrid eventId={event.id} />
+          <SlotGrid eventId={event.id} refreshKey={slotRefreshKey} />
           {slotlessOrders.length > 0 && (
             <div className="mt-6">
               <h3 className="font-display font-bold text-chocolate mb-3">

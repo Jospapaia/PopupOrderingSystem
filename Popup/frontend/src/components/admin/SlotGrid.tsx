@@ -6,12 +6,13 @@ import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from "../../utils/eventStatu
 
 interface Props {
   eventId: string;
+  refreshKey?: number;
 }
 
 const inputCls =
   "bg-white border-2 border-caramel-200 focus:border-caramel-500 rounded-xl px-3 py-2 text-sm text-chocolate outline-none transition-colors placeholder:text-caramel-300";
 
-export default function SlotGrid({ eventId }: Props) {
+export default function SlotGrid({ eventId, refreshKey }: Props) {
   const [slots, setSlots] = useState<SlotAdminOut[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
@@ -21,7 +22,7 @@ export default function SlotGrid({ eventId }: Props) {
   const load = () =>
     adminListSlots(eventId).then(setSlots).catch((e: unknown) => setError(toApiError(e).message));
 
-  useEffect(() => { load(); }, [eventId]);
+  useEffect(() => { load(); }, [eventId, refreshKey]);
 
   const handleUpdateSlot = async (slotId: string) => {
     setSlotEditError({});
@@ -88,7 +89,7 @@ export default function SlotGrid({ eventId }: Props) {
                 <span className="text-caramel-400 text-sm">– {formatTime(slot.slot_end)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <CapacityDots booked={slot.booked_portions} max={slot.max_ice_cream_effective} />
+                <CapacityBar booked={slot.booked_portions} max={slot.max_ice_cream_effective} />
                 {slot.is_full && (
                   <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">מלא</span>
                 )}
@@ -144,16 +145,16 @@ export default function SlotGrid({ eventId }: Props) {
   );
 }
 
-function CapacityDots({ booked, max }: { booked: number; max: number }) {
-  const dots = Array.from({ length: max }, (_, i) => i < booked);
+function CapacityBar({ booked, max }: { booked: number; max: number }) {
+  const pct = max > 0 ? Math.min(100, (booked / max) * 100) : 0;
+  const barColor = pct >= 100 ? "bg-red-400" : pct >= 75 ? "bg-amber-400" : "bg-green-400";
+  const textColor = pct >= 100 ? "text-red-600" : pct >= 75 ? "text-amber-600" : "text-caramel-500";
   return (
-    <div className="flex gap-1">
-      {dots.map((taken, i) => (
-        <div
-          key={i}
-          className={`w-4 h-4 rounded-sm ${taken ? "bg-red-400" : "bg-green-400"}`}
-        />
-      ))}
+    <div className="flex items-center gap-2">
+      <div className="w-20 h-2 bg-caramel-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className={`text-xs font-semibold tabular-nums ${textColor}`}>{booked}/{max}</span>
     </div>
   );
 }
