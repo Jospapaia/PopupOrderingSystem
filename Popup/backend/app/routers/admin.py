@@ -550,6 +550,7 @@ def remove_order_item(item_id: uuid.UUID, db: Session = Depends(get_db)) -> Orde
     if order.status == OrderStatus.picked_up:
         raise HTTPException(status_code=409, detail="לא ניתן לשנות הזמנה שנאספה")
     order_id_val = order.id
+    was_ice_cream = oi.used_ice_cream
     db.delete(oi)
     db.flush()
     remaining = db.execute(
@@ -559,6 +560,16 @@ def remove_order_item(item_id: uuid.UUID, db: Session = Depends(get_db)) -> Orde
         db.delete(order)
         db.commit()
         return None  # type: ignore[return-value]
+    # If the removed item counted against ice cream capacity, check whether
+    # any ice cream items remain. If not, detach the order from its slot —
+    # the slot association only exists to enforce ice cream capacity.
+    if was_ice_cream and order.slot_id is not None:
+        ice_cream_left = db.execute(
+            select(func.count(OrderItem.id))
+            .where(OrderItem.order_id == order_id_val, OrderItem.used_ice_cream == True)
+        ).scalar_one()
+        if ice_cream_left == 0:
+            order.slot_id = None
     db.commit()
     return _load_order_with_products(db, order_id_val)  # type: ignore[return-value]
 
