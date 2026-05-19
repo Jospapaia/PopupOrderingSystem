@@ -25,7 +25,7 @@ from ..schemas import (
     EventCreate, EventUpdate, EventOut,
     SlotUpdate, SlotAdminOut, OrderSummary, OrderItemSummary,
     EventMenuItemCreate, EventMenuItemUpdate, EventMenuItemOut, MenuItemReorderPayload,
-    OrderOut, AboutPageOut, AboutPageUpdate,
+    OrderOut, OrderItemUpdate, AboutPageOut, AboutPageUpdate,
 )
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
@@ -530,23 +530,50 @@ def pickup_order(order_id: uuid.UUID, db: Session = Depends(get_db)) -> OrderOut
     return order
 
 
+@router.delete("/orders/{order_id}", status_code=204, response_model=None)
+def delete_order(order_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="ההזמנה לא נמצאה")
+    db.delete(order)
+    db.commit()
+
+
 @router.delete("/order-items/{item_id}", response_model=OrderOut)
 def remove_order_item(item_id: uuid.UUID, db: Session = Depends(get_db)) -> OrderOut:
     oi = db.get(OrderItem, item_id)
     if oi is None:
         raise HTTPException(status_code=404, detail="פריט ההזמנה לא נמצא")
     order = _load_order_with_products(db, oi.order_id)
-    if order is None or order.status == OrderStatus.cancelled:
-        raise HTTPException(status_code=409, detail="ההזמנה כבר בוטלה")
+    if order is None:
+        raise HTTPException(status_code=404, detail="ההזמנה לא נמצאה")
     if order.status == OrderStatus.picked_up:
         raise HTTPException(status_code=409, detail="לא ניתן לשנות הזמנה שנאספה")
+    order_id_val = order.id
     db.delete(oi)
     db.flush()
     remaining = db.execute(
-        select(func.count(OrderItem.id)).where(OrderItem.order_id == order.id)
+        select(func.count(OrderItem.id)).where(OrderItem.order_id == order_id_val)
     ).scalar_one()
     if remaining == 0:
-        order.status = OrderStatus.cancelled
+        db.delete(order)
+        db.commit()
+        return None  # type: ignore[return-value]
+    db.commit()
+    return _load_order_with_products(db, order_id_val)  # type: ignore[return-value]
+
+
+@router.patch("/order-items/{item_id}", response_model=OrderOut)
+def update_order_item(item_id: uuid.UUID, payload: OrderItemUpdate, db: Session = Depends(get_db)) -> OrderOut:
+    oi = db.get(OrderItem, item_id)
+    if oi is None:
+        raise HTTPException(status_code=404, detail="פריט ההזמנה לא נמצא")
+    order = _load_order_with_products(db, oi.order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="ההזמנה לא נמצאה")
+    if order.status == OrderStatus.picked_up:
+        raise HTTPException(status_code=409, detail="לא ניתן לשנות הזמנה שנאספה")
+    oi.quantity = payload.quantity
     db.commit()
     return _load_order_with_products(db, order.id)  # type: ignore[return-value]
 

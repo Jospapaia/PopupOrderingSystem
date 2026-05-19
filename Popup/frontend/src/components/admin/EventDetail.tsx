@@ -5,7 +5,7 @@ import {
   adminPublishEvent, adminCompleteEvent, adminCancelEvent, adminDeleteEvent,
   adminListMenuItems, adminAddMenuItem, adminUpdateMenuItem, adminDeleteMenuItem,
   adminReorderMenuItems, adminListProducts, adminCreateProduct, adminUpdateEvent, adminListOrders,
-  adminPickupOrder, adminCancelOrder, adminRemoveOrderItem, toApiError,
+  adminPickupOrder, adminCancelOrder, adminDeleteOrder, adminRemoveOrderItem, adminUpdateOrderItem, toApiError,
 } from "../../api/client";
 import SlotGrid from "./SlotGrid";
 import { STATUS_LABELS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ICE_CREAM_MODES, ICE_CREAM_MODE_LABELS } from "../../utils/eventStatus";
@@ -51,6 +51,8 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [isSaving, setIsSaving] = useState(false);
   const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editingQtys, setEditingQtys] = useState<Record<string, number>>({});
 
   const loadMenu = () =>
     adminListMenuItems(event.id).then(setMenuItems).catch((e: unknown) => setError(toApiError(e).message));
@@ -214,23 +216,46 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
     }
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    if (!window.confirm("לבטל הזמנה זו?")) return;
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm("למחוק הזמנה זו לצמיתות?")) return;
     try {
-      const updated = await adminCancelOrder(orderId);
-      setAllOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
-      setSlotlessOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
+      await adminDeleteOrder(orderId);
+      setAllOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setSlotlessOrders((prev) => prev.filter((o) => o.id !== orderId));
+      if (editingOrderId === orderId) setEditingOrderId(null);
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
   };
 
-  const handleRemoveItem = (orderId: string, itemId: string, productName: string) => async () => {
-    if (!window.confirm(`להסיר "${productName}" מההזמנה?`)) return;
+  const startEditOrder = (order: OrderOut) => {
+    setEditingOrderId(order.id);
+    const qtys: Record<string, number> = {};
+    for (const oi of order.items) qtys[oi.id] = oi.quantity;
+    setEditingQtys(qtys);
+  };
+
+  const handleSaveOrderEdit = async (orderId: string, originalItems: OrderOut["items"]) => {
     try {
-      const updated = await adminRemoveOrderItem(itemId);
-      setAllOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
-      setSlotlessOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+      let updatedOrder: OrderOut | null = null;
+      for (const oi of originalItems) {
+        const newQty = editingQtys[oi.id];
+        if (newQty === undefined) continue;
+        if (newQty === 0) {
+          updatedOrder = await adminRemoveOrderItem(oi.id);
+        } else if (newQty !== oi.quantity) {
+          updatedOrder = await adminUpdateOrderItem(oi.id, newQty);
+        }
+      }
+      if (updatedOrder === null) {
+        // order was fully deleted (last item removed)
+        setAllOrders((prev) => prev.filter((o) => o.id !== orderId));
+        setSlotlessOrders((prev) => prev.filter((o) => o.id !== orderId));
+      } else {
+        setAllOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder! : o)));
+        setSlotlessOrders((prev) => prev.map((o) => (o.id === orderId ? updatedOrder! : o)));
+      }
+      setEditingOrderId(null);
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
@@ -626,56 +651,109 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
               )}
               {[...allOrders]
                 .sort((a, b) => a.created_at.localeCompare(b.created_at))
-                .map((order, idx) => (
-                  <div
-                    key={order.id}
-                    className={`bg-white border border-caramel-100 rounded-2xl shadow-card p-3 text-sm ${order.status === "cancelled" ? "opacity-50" : ""}`}
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-chocolate text-xs bg-caramel-100 rounded-full w-6 h-6 flex items-center justify-center shrink-0">
-                          {idx + 1}
-                        </span>
-                        <span className="font-semibold text-chocolate">{order.customer_name}</span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
-                          {ORDER_STATUS_LABELS[order.status]}
-                        </span>
-                        <span className="text-xs text-caramel-400">{formatTime(order.created_at)}</span>
+                .map((order, idx) => {
+                  const isEditing = editingOrderId === order.id;
+                  const canEdit = order.status !== "picked_up";
+                  return (
+                    <div
+                      key={order.id}
+                      className="bg-white border border-caramel-100 rounded-2xl shadow-card p-3 text-sm"
+                    >
+                      {/* Header row */}
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-chocolate text-xs bg-caramel-100 rounded-full w-6 h-6 flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="font-semibold text-chocolate">{order.customer_name}</span>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
+                            {ORDER_STATUS_LABELS[order.status]}
+                          </span>
+                          <span className="text-xs text-caramel-400">{formatTime(order.created_at)}</span>
+                        </div>
+                        {canEdit && !isEditing && (
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => startEditOrder(order)}
+                              className="text-xs bg-parchment border border-caramel-200 text-chocolate px-2 py-1 rounded-lg font-medium hover:bg-caramel-100 transition-colors"
+                            >
+                              עריכה
+                            </button>
+                            <button
+                              onClick={() => void handleDeleteOrder(order.id)}
+                              className="text-xs bg-red-50 border border-red-100 text-red-600 px-2 py-1 rounded-lg font-medium hover:bg-red-100 transition-colors"
+                            >
+                              מחק
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      {order.status === "confirmed" && (
-                        <button
-                          onClick={() => void handleCancelOrder(order.id)}
-                          className="text-xs bg-red-50 border border-red-100 text-red-600 px-2 py-1 rounded-lg font-medium hover:bg-red-100 transition-colors shrink-0"
-                        >
-                          בטל הזמנה
-                        </button>
+
+                      {/* Items — view mode */}
+                      {!isEditing && (
+                        <div className="mt-2 space-y-0.5 pr-8">
+                          {order.items.map((oi) => (
+                            <div key={oi.id} className="text-caramel-700">
+                              {oi.product_name} ×{oi.quantity}
+                              {oi.with_ice_cream === true && <span className="text-caramel-400 text-xs"> (עם גלידה)</span>}
+                              {oi.with_ice_cream === false && <span className="text-caramel-400 text-xs"> (ללא גלידה)</span>}
+                            </div>
+                          ))}
+                          {order.notes && <p className="text-xs text-amber-600 mt-1">הערה: {order.notes}</p>}
+                        </div>
+                      )}
+
+                      {/* Items — edit mode */}
+                      {isEditing && (
+                        <div className="mt-3 space-y-2 pr-8">
+                          {order.items.map((oi) => {
+                            const qty = editingQtys[oi.id] ?? oi.quantity;
+                            return (
+                              <div key={oi.id} className="flex items-center gap-2">
+                                <span className="flex-1 text-caramel-700 text-xs">
+                                  {oi.product_name}
+                                  {oi.with_ice_cream === true && <span className="text-caramel-400"> (עם גלידה)</span>}
+                                  {oi.with_ice_cream === false && <span className="text-caramel-400"> (ללא גלידה)</span>}
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={qty}
+                                  onChange={(e) => {
+                                    const v = parseInt(e.target.value);
+                                    setEditingQtys((p) => ({ ...p, [oi.id]: isNaN(v) ? 0 : v }));
+                                  }}
+                                  className="w-14 border-2 border-caramel-200 focus:border-caramel-500 rounded-lg px-2 py-0.5 text-sm text-chocolate outline-none text-center"
+                                />
+                                <button
+                                  onClick={() => setEditingQtys((p) => ({ ...p, [oi.id]: 0 }))}
+                                  className="text-xs text-red-400 hover:text-red-600 transition-colors font-bold leading-none"
+                                  title="הסר פריט"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            );
+                          })}
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={() => void handleSaveOrderEdit(order.id, order.items)}
+                              className="text-xs bg-chocolate text-cream px-3 py-1.5 rounded-lg font-semibold hover:bg-chocolate-light transition-colors"
+                            >
+                              שמור
+                            </button>
+                            <button
+                              onClick={() => setEditingOrderId(null)}
+                              className="text-xs bg-parchment border border-caramel-200 text-chocolate px-3 py-1.5 rounded-lg font-semibold hover:bg-caramel-100 transition-colors"
+                            >
+                              ביטול
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="mt-2 space-y-1 pr-8">
-                      {order.items.map((oi) => (
-                        <div key={oi.id} className="flex items-center justify-between gap-2">
-                          <span className="text-caramel-700">
-                            {oi.product_name} ×{oi.quantity}
-                            {oi.with_ice_cream === true && <span className="text-caramel-400 text-xs"> (עם גלידה)</span>}
-                            {oi.with_ice_cream === false && <span className="text-caramel-400 text-xs"> (ללא גלידה)</span>}
-                          </span>
-                          {order.status === "confirmed" && (
-                            <button
-                              onClick={handleRemoveItem(order.id, oi.id, oi.product_name)}
-                              className="text-xs text-red-400 hover:text-red-600 transition-colors font-medium leading-none"
-                              title="הסר פריט"
-                            >
-                              ✕
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {order.notes && (
-                      <p className="text-xs text-amber-600 mt-1.5 pr-8">הערה: {order.notes}</p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           )}
 

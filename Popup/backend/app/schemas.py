@@ -199,6 +199,10 @@ class EventMenuItemPublicOut(BaseModel):
 
 # ── Orders ────────────────────────────────────────────────────────────────────
 
+class OrderItemUpdate(BaseModel):
+    quantity: int = Field(..., gt=0)
+
+
 class OrderItemIn(BaseModel):
     event_menu_item_id: uuid.UUID
     quantity: int = Field(..., gt=0)
