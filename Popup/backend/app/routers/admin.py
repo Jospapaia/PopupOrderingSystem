@@ -168,7 +168,8 @@ async def upload_about_image(
     if about is None:
         about = AboutPage(id=1)
         db.add(about)
-    about.image_url = f"/static/uploads/about.{ext}"
+    ts = int(datetime.now(timezone.utc).timestamp())
+    about.image_url = f"/static/uploads/about.{ext}?v={ts}"
     db.commit()
     db.refresh(about)
     return about
@@ -225,7 +226,8 @@ async def upload_product_image(
     dest = STATIC_UPLOADS / filename
     dest.write_bytes(content)
 
-    product.image_url = f"/static/uploads/{filename}"
+    ts = int(datetime.now(timezone.utc).timestamp())
+    product.image_url = f"/static/uploads/{filename}?v={ts}"
     db.commit()
     db.refresh(product)
     return product
