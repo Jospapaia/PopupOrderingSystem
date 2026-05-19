@@ -14,6 +14,7 @@ export interface SlotPublic {
 export interface MenuItemPublic {
   id: string;
   product_name: string;
+  description: string | null;
   ice_cream_mode: IceCreamMode;
   price: number;
   ice_cream_addon_price: number | null;

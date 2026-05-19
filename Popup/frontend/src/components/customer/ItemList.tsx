@@ -142,6 +142,11 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
                   </span>
                 </div>
 
+                {/* Product description */}
+                {item.description && (
+                  <p className="text-xs text-caramel-500 leading-relaxed mb-1.5">{item.description}</p>
+                )}
+
                 {/* Ice cream mode badge */}
                 {isIncluded && (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-caramel-600 bg-caramel-50 border border-caramel-200/70 rounded-full px-2 py-0.5 mb-1.5">
@@ -150,11 +155,11 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
                 )}
                 {isOptional && item.ice_cream_addon_price ? (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-caramel-500 bg-caramel-50 border border-caramel-200/70 rounded-full px-2 py-0.5 mb-1.5">
-                    🍦 גלידה אפשרית · +₪{item.ice_cream_addon_price.toFixed(0)}
+                    תוספת גלידה ₪{item.ice_cream_addon_price.toFixed(0)}
                   </span>
                 ) : isOptional ? (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-caramel-500 bg-caramel-50 border border-caramel-200/70 rounded-full px-2 py-0.5 mb-1.5">
-                    🍦 גלידה אפשרית
+                    תוספת גלידה
                   </span>
                 ) : null}
 

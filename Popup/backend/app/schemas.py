@@ -182,6 +182,7 @@ class EventMenuItemOut(BaseModel):
 class EventMenuItemPublicOut(BaseModel):
     id: uuid.UUID
     product_name: str
+    description: Optional[str] = None
     ice_cream_mode: IceCreamMode
     price: DecimalAsFloat
     ice_cream_addon_price: Optional[DecimalAsFloat]

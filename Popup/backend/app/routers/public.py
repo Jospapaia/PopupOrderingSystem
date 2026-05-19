@@ -104,6 +104,7 @@ def _get_upcoming_event_data(db: Session, today: date) -> UpcomingEventResponse:
         menu_out.append(EventMenuItemPublicOut(
             id=item.id,
             product_name=item.product.name,
+            description=item.product.description,
             ice_cream_mode=item.product.ice_cream_mode,
             price=item.price,
             ice_cream_addon_price=item.ice_cream_addon_price,

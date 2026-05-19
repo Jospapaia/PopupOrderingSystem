@@ -167,7 +167,9 @@ export default function EventPage({ event }: Props) {
             <div className="relative bg-white/80 border border-caramel-200/70 rounded-2xl px-5 py-4 text-center shadow-sm overflow-hidden">
               <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
               <p className={`text-sm text-caramel-700 leading-relaxed ${!descExpanded && descIsLong ? "line-clamp-3" : ""}`}>
-                {event.description}
+                {event.description?.split(/<br\s*\/?>/i).map((part, i, arr) => (
+                  <span key={i}>{part}{i < arr.length - 1 && <br />}</span>
+                ))}
               </p>
               {!descExpanded && descIsLong && (
                 <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-white/90 to-transparent pointer-events-none" />
