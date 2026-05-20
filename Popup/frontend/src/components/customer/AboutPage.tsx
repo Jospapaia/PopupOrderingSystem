@@ -11,24 +11,36 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-parchment" dir="rtl">
-      <header className="bg-chocolate text-cream px-5 py-4 flex items-center gap-3">
-        <a href="/" className="text-caramel-300 hover:text-cream transition-colors text-lg leading-none">‹</a>
-        <h1 className="font-display font-bold text-lg">קצת עלי</h1>
-      </header>
 
-      <main className="max-w-sm mx-auto px-5 py-8">
-        {about?.image_url && (
-          <div className="mb-6 flex justify-center">
-            <img
-              src={`${BASE}${about.image_url}`}
-              alt="תמונה"
-              className="w-44 h-44 rounded-full object-cover shadow-lg border-4 border-white"
-            />
-          </div>
-        )}
+      {/* Hero image — full-width, takes top of page */}
+      {about?.image_url ? (
+        <div className="relative w-full" style={{ height: "55vw", maxHeight: "360px", minHeight: "220px" }}>
+          <img
+            src={`${BASE}${about.image_url}`}
+            alt="תמונה"
+            className="w-full h-full object-cover object-top"
+          />
+          {/* gradient overlay so back button is readable */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
+          <a
+            href="/"
+            className="absolute top-4 right-5 text-white/90 hover:text-white transition-colors text-2xl leading-none"
+          >
+            ‹
+          </a>
+        </div>
+      ) : (
+        <header className="bg-chocolate text-cream px-5 py-4 flex items-center gap-3">
+          <a href="/" className="text-caramel-300 hover:text-cream transition-colors text-lg leading-none">‹</a>
+          <h1 className="font-display font-bold text-lg">קצת עלי</h1>
+        </header>
+      )}
+
+      <main className="max-w-sm mx-auto px-5 py-7">
+        <h1 className="font-display font-bold text-2xl text-chocolate mb-5">קצת עלי</h1>
 
         {about?.bio_text && (
-          <div className="bg-white rounded-2xl px-5 py-5 shadow-card text-sm text-caramel-700 leading-relaxed whitespace-pre-line">
+          <div className="bg-white rounded-2xl px-5 py-5 shadow-card text-base text-caramel-700 leading-loose whitespace-pre-line">
             {about.bio_text}
           </div>
         )}
