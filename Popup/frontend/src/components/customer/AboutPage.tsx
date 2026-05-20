@@ -18,7 +18,7 @@ export default function AboutPage() {
           <img
             src={`${BASE}${about.image_url}`}
             alt="תמונה"
-            className="w-full h-full object-cover object-top"
+            className="w-full h-full object-contain bg-black"
           />
           {/* gradient overlay so back button is readable */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
