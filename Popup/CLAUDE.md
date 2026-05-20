@@ -22,10 +22,10 @@ backend/
     routers/
       public.py       # GET /events/upcoming, POST /orders
       admin.py        # All /admin/* endpoints
-  alembic/            # DB migrations (0001 initial, 0002 add event description)
+  alembic/            # DB migrations (0001 initial … 0005 menu sort_order)
   Dockerfile
   requirements.txt
-  static/uploads/     # Product images (served at /static/uploads/)
+  static/uploads/     # Product + about images (served at /static/uploads/, persisted via Docker named volume)
 
 frontend/
   src/
@@ -33,13 +33,13 @@ frontend/
       client.ts       # All API calls; handles 401 → redirect to password gate
       types.ts        # TypeScript interfaces matching backend schemas
     components/
-      customer/       # CustomerApp, EventPage, ItemList, SlotPicker, OrderForm, Confirmation
-      admin/          # AdminApp, PasswordGate, EventList, EventDetail, SlotGrid, ProductList
+      customer/       # CustomerApp, EventPage, ItemList, SlotPicker, OrderForm, Confirmation, AboutPage
+      admin/          # AdminApp, PasswordGate, EventList, EventDetail, SlotGrid, ProductList, AboutEditor
     utils/
       format.ts       # formatTime (Asia/Jerusalem tz), formatDate, formatTimeRange
       eventStatus.ts  # STATUS_LABELS, STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS
       cart.ts         # cartItemQuantity, itemLineTotal, cartTotal, cartIceCreamPortions, needsSlotForCart
-    App.tsx           # Routes: /admin → AdminApp, else → CustomerApp
+    App.tsx           # Routes: /admin → AdminApp, /about → AboutPage, else → CustomerApp
     main.tsx
     index.css         # Design system: chocolate/caramel/gold/cream/parchment, Secular One + Rubik fonts
   index.html          # lang="he" dir="rtl"
@@ -64,7 +64,7 @@ README.md             # Local setup + deployment guide
 - **ASM-3:** No post-session order lookup. Customer sees confirmation screen only.
 - **ASM-4:** No auto-close. Admin manually completes the event.
 - **ASM-5:** No waitlist. Full slot = disabled in UI.
-- **ASM-6:** Images on backend filesystem at `static/uploads/`. Ephemeral on Railway (acceptable for launch).
+- **ASM-6:** Images on backend filesystem at `static/uploads/`, mounted as a Docker named volume (`uploads`) so they survive rebuilds. Image URLs include a `?v=<timestamp>` cache-buster appended on every upload.
 - **ASM-7:** Product deletion allowed when no `event_menu_items` reference the product (409 if referenced). Retire by removing from future events; deletion is a cleanup-only operation.
 - **ASM-8:** `ice_cream_mode` change on a product is allowed even with existing confirmed orders.
 - **ASM-9:** Partial submission failure (network drops mid-response) is acceptable — admin handles it at event.
@@ -108,11 +108,12 @@ Generated on `POST /admin/events/{id}/publish` (draft → published). Algorithm:
 ### Order Lifecycle
 - Created immediately as `confirmed`
 - Admin can mark `picked_up` (irreversible — dialog required)
-- Admin can `cancel` confirmed orders only (`picked_up → cancelled` is blocked)
-  — cancellation releases capacity (capacity query excludes cancelled orders)
+- Admin can hard-delete an order (`DELETE /admin/orders/{id}`) — removes from DB entirely, capacity freed immediately
+- Admin can edit an order: change item quantities (`PATCH /admin/order-items/{id}`) or remove individual items (`DELETE /admin/order-items/{id}`). Removing the last item auto-deletes the order. Removing the last ice cream item clears `slot_id` (order moves to slotless section).
+- Legacy cancel (`POST /admin/orders/{id}/cancel`) still exists for the slotless-orders panel in the slots tab.
 
 ### Event Description
-`events.description` (Text, nullable) — shown to customers in a collapsible card between the header and menu. Editable by admin at any status. Added in migration 0002.
+`events.description` (Text, nullable) — shown to customers in full (no expand/collapse) in a styled card between the header and menu. Splits on `\n` or `<br>` for line breaks. Editable by admin at any status. Added in migration 0002.
 
 ### Event Deletion
 `DELETE /admin/events/{id}` — available for **all** statuses. Cascade order:
@@ -120,8 +121,27 @@ Generated on `POST /admin/events/{id}/publish` (draft → published). Algorithm:
 2. `db.flush()` — clears `order_items` FK refs before menu items are deleted
 3. Event deleted — cascades to `slots` and `menu_items` via ORM relationship
 
+### Menu Item Sort Order
+`event_menu_items.sort_order` (Integer, default 0, migration 0005) — admin can drag-and-drop rows in the menu tab to reorder. Saved via `PUT /admin/events/{id}/menu/reorder` with an ordered list of item IDs. Both admin list and customer-facing menu query order by `sort_order`. New items appended at `max(sort_order) + 1`.
+
+### About Page
+Singleton table `about_page` (id=1, migration 0004). Fields: `bio_text` (Text, nullable), `image_url` (String, nullable).
+- Public: `GET /about` → `AboutPage.tsx` (`/about` route) — full-width hero image at natural aspect ratio + enlarged bio text.
+- Admin: `GET/PATCH /admin/about`, `POST /admin/about/image` → `AboutEditor.tsx` (third tab "אודות" in AdminApp).
+- Event page header shows a "קצת עלי ›" pill link when `bio_text` is set.
+- "יצירת קשר" WhatsApp link (`wa.me/972509230882`) appears in the event header and on the confirmation screen.
+
+### SlotGrid Capacity Display
+`SlotGrid` uses a thin progress bar + `booked/max` fraction instead of coloured squares — scales to any capacity. Accepts a `refreshKey` prop; `EventDetail` increments it after any order edit/delete so the slot view stays in sync without a page reload. The slot order list only shows items where `used_ice_cream=true`.
+
 ### Price Snapshot
 `unit_price` stored at order creation = `event_menu_items.price + ice_cream_addon_price` (if with_ice_cream=true). Never recalculated.
+
+### Admin Orders Tab
+`EventDetail` has three tabs: **תפריט**, **סלוטים**, **הזמנות**.
+- **הזמנות** tab has two sub-views toggled by buttons:
+  - **לפי הזמנה** — sequential numbered list; confirmed orders show "עריכה" (inline qty/remove edit) and "מחק" (hard delete).
+  - **לפי מוצר** — per-menu-item remaining/available badge + buyer list aggregated from non-cancelled orders.
 
 ## Admin Auth
 All `/admin/*` routes require `Authorization: Bearer {ADMIN_PASSWORD}`.
