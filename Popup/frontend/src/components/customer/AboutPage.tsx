@@ -14,11 +14,11 @@ export default function AboutPage() {
 
       {/* Hero image — full-width, takes top of page */}
       {about?.image_url ? (
-        <div className="relative w-full" style={{ height: "55vw", maxHeight: "360px", minHeight: "220px" }}>
+        <div className="relative w-full bg-parchment">
           <img
             src={`${BASE}${about.image_url}`}
             alt="תמונה"
-            className="w-full h-full object-contain bg-black"
+            className="w-full h-auto block"
           />
           {/* gradient overlay so back button is readable */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
