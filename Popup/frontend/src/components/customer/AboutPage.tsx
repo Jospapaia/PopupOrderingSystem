@@ -24,7 +24,7 @@ export default function AboutPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
           <a
             href="/"
-            className="absolute top-4 right-5 text-white/90 hover:text-white transition-colors text-2xl leading-none"
+            className="absolute top-4 right-4 flex items-center justify-center w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white/90 hover:bg-black/60 hover:text-white transition-colors text-2xl leading-none shadow-md"
           >
             ‹
           </a>

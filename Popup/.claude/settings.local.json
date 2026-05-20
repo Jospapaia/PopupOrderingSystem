@@ -94,7 +94,18 @@
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://10.100.102.7:5173/events/upcoming\" -UseBasicParsing -TimeoutSec 5; \"Status: $\\($r.StatusCode\\) | $\\($r.Content\\)\" } catch { \"FAILED: $_\" })",
       "PowerShell(Start-Process powershell -ArgumentList \"-NoExit\", \"-Command\", \"cd 'C:\\\\Projects\\\\MyPersonalInvestors'; .\\\\start.ps1\")",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://10.100.102.7:5173/events/upcoming\" -UseBasicParsing -TimeoutSec 5; \"OK: $\\($r.Content\\)\" } catch { \"FAILED: $_\" })",
-      "PowerShell(Start-Sleep -Seconds 3; try { $r = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 5; \"Vite: OK \\($\\($r.StatusCode\\)\\)\" } catch { \"Vite: FAILED - $_\" }; try { $r = Invoke-WebRequest -Uri \"http://10.100.102.7:8002/admin/events\" -UseBasicParsing -TimeoutSec 5 -Headers @{Authorization=\"Bearer changeme\"}; \"Admin API: OK \\($\\($r.StatusCode\\)\\)\" } catch { \"Admin API: FAILED - $_\" })"
+      "PowerShell(Start-Sleep -Seconds 3; try { $r = Invoke-WebRequest -Uri \"http://localhost:5173\" -UseBasicParsing -TimeoutSec 5; \"Vite: OK \\($\\($r.StatusCode\\)\\)\" } catch { \"Vite: FAILED - $_\" }; try { $r = Invoke-WebRequest -Uri \"http://10.100.102.7:8002/admin/events\" -UseBasicParsing -TimeoutSec 5 -Headers @{Authorization=\"Bearer changeme\"}; \"Admin API: OK \\($\\($r.StatusCode\\)\\)\" } catch { \"Admin API: FAILED - $_\" })",
+      "Bash(docker compose *)",
+      "PowerShell(Get-Content *)",
+      "Bash(docker-compose build *)",
+      "Bash(docker-compose logs *)",
+      "Bash(Get-ChildItem *)",
+      "Bash(curl -s http://localhost:8002/health)",
+      "Bash(curl -s http://localhost:8002/events/upcoming)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); e=d.get\\('event'\\); print\\('event:', e['title'] if e else 'None'\\); print\\('description field exists:', 'description' in e if e else 'N/A'\\); print\\('menu_items:', len\\(e['menu_items']\\) if e else 0\\); print\\('slots:', len\\(e['slots']\\) if e else 0\\)\")",
+      "Bash(gh repo *)",
+      "Bash(winget install *)",
+      "PowerShell(gh repo *)"
     ]
   }
 }
