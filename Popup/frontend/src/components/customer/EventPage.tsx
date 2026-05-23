@@ -5,7 +5,7 @@ import SlotPicker from "./SlotPicker";
 import OrderForm from "./OrderForm";
 import Confirmation from "./Confirmation";
 import { createOrder, getUpcomingEvent, getAbout, BASE, toApiError } from "../../api/client";
-import { formatDate, formatTimeRange } from "../../utils/format";
+import { formatDate, formatDayOfWeek, formatTimeRange } from "../../utils/format";
 import { needsSlotForCart, cartIceCreamPortions, cartItemQuantity } from "../../utils/cart";
 
 type Step = "items" | "slot" | "name" | "done";
@@ -148,8 +148,11 @@ export default function EventPage({ event }: Props) {
             <div className="h-px w-10 bg-gold" />
           </div>
 
-          <p className="text-caramel-300 text-sm tracking-wide">
-            {formatDate(event.date)} · {formatTimeRange(event.start_time, event.end_time)}
+          <p className="text-cream text-base font-semibold tracking-wide">
+            {formatDayOfWeek(event.date)}, {formatDate(event.date)}
+          </p>
+          <p className="text-caramel-200 text-sm tracking-widest mt-0.5">
+            {formatTimeRange(event.start_time, event.end_time)}
           </p>
 
           <div className="flex items-center justify-center gap-3 mt-3">
