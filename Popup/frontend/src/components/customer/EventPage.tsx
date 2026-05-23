@@ -152,7 +152,7 @@ export default function EventPage({ event }: Props) {
             {formatDayOfWeek(event.date)}, {formatDate(event.date)}
           </p>
           <p className="text-caramel-200 text-sm tracking-widest mt-0.5">
-            {formatTimeRange(event.start_time, event.end_time)}
+            {formatTimeRange(event.end_time, event.start_time)}
           </p>
 
           <div className="flex items-center justify-center gap-3 mt-3">
