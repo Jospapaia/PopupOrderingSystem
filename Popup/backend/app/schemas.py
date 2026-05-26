@@ -204,6 +204,10 @@ class OrderItemUpdate(BaseModel):
     quantity: int = Field(..., gt=0)
 
 
+class OrderSlotUpdate(BaseModel):
+    slot_id: Optional[uuid.UUID] = None
+
+
 class OrderItemIn(BaseModel):
     event_menu_item_id: uuid.UUID
     quantity: int = Field(..., gt=0)

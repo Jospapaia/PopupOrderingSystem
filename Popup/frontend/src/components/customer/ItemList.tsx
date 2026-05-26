@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { MenuItemPublic, CartItem } from "../../api/types";
 import { cartTotal, cartItemQuantity } from "../../utils/cart";
 
@@ -80,9 +81,21 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
     }
   };
 
+  const [showIceCreamWarning, setShowIceCreamWarning] = useState(false);
+
   const total     = cartTotal(cart);
   const hasItems  = cart.some((ci) => cartItemQuantity(ci) > 0);
   const cartCount = cart.reduce((n, ci) => n + cartItemQuantity(ci), 0);
+
+  const handleNext = () => {
+    const hasOptionalWithoutIceCream = cart.some(
+      (ci) => ci.menuItem.ice_cream_mode === "optional" &&
+               ci.quantityWithIceCream === 0 &&
+               ci.quantityWithoutIceCream > 0
+    );
+    if (hasOptionalWithoutIceCream) setShowIceCreamWarning(true);
+    else onNext();
+  };
 
   const staggerClass = ["stagger-1","stagger-2","stagger-3","stagger-4","stagger-5"];
 
@@ -260,6 +273,35 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
         })}
       </div>
 
+      {/* ── Ice cream warning modal ── */}
+      {showIceCreamWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-3xl shadow-xl p-6 max-w-xs w-full text-center space-y-4" dir="rtl">
+            <div className="text-4xl">🍦</div>
+            <h3 className="font-display font-bold text-chocolate text-lg">רגע לפני</h3>
+            <p className="text-caramel-600 text-sm leading-relaxed">
+              בסל נמצאים מוצרים שמאפשרים תוספת גלידה, אך לא נוספה גלידה לאף מנה.
+              <br />
+              להמשיך ללא גלידה?
+            </p>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={() => setShowIceCreamWarning(false)}
+                className="flex-1 py-2.5 rounded-2xl border-2 border-caramel-200 text-chocolate font-semibold text-sm hover:bg-caramel-50 transition-colors"
+              >
+                חזרה
+              </button>
+              <button
+                onClick={() => { setShowIceCreamWarning(false); onNext(); }}
+                className="flex-1 py-2.5 rounded-2xl bg-chocolate text-cream font-semibold text-sm hover:bg-chocolate-light transition-colors"
+              >
+                המשך
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Fixed bottom bar ── */}
       {hasItems && (
         <div className="fixed bottom-0 inset-x-0 z-50 animate-slide-up">
@@ -270,7 +312,7 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
                 {" "}{cartCount === 1 ? "פריט" : "פריטים"}
               </div>
               <button
-                onClick={onNext}
+                onClick={handleNext}
                 className="
                   flex-1 bg-chocolate text-cream py-3 rounded-2xl font-bold text-base
                   shadow-button-lg flex justify-between items-center px-5

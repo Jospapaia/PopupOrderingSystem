@@ -25,7 +25,7 @@ from ..schemas import (
     EventCreate, EventUpdate, EventOut,
     SlotUpdate, SlotAdminOut, OrderSummary, OrderItemSummary,
     EventMenuItemCreate, EventMenuItemUpdate, EventMenuItemOut, MenuItemReorderPayload,
-    OrderOut, OrderItemUpdate, AboutPageOut, AboutPageUpdate,
+    OrderOut, OrderItemUpdate, OrderSlotUpdate, AboutPageOut, AboutPageUpdate,
 )
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
@@ -588,6 +588,51 @@ def update_order_item(item_id: uuid.UUID, payload: OrderItemUpdate, db: Session 
     oi.quantity = payload.quantity
     db.commit()
     return _load_order_with_products(db, order.id)  # type: ignore[return-value]
+
+
+@router.patch("/orders/{order_id}/slot", response_model=OrderOut)
+def update_order_slot(order_id: uuid.UUID, payload: OrderSlotUpdate, db: Session = Depends(get_db)) -> OrderOut:
+    order = _load_order_with_products(db, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="ההזמנה לא נמצאה")
+    if order.status == OrderStatus.picked_up:
+        raise HTTPException(status_code=409, detail="לא ניתן לשנות הזמנה שנאספה")
+
+    if payload.slot_id is None:
+        order.slot_id = None
+        db.commit()
+        return _load_order_with_products(db, order_id)  # type: ignore[return-value]
+
+    new_slot = db.execute(
+        select(Slot).where(Slot.id == payload.slot_id, Slot.event_id == order.event_id).with_for_update()
+    ).scalar_one_or_none()
+    if new_slot is None:
+        raise HTTPException(status_code=404, detail="הסלוט לא נמצא")
+
+    order_ice_cream: int = db.execute(
+        select(func.coalesce(func.sum(OrderItem.quantity), 0))
+        .where(OrderItem.order_id == order_id, OrderItem.used_ice_cream == True)
+    ).scalar_one() or 0
+
+    if order_ice_cream > 0:
+        event = db.get(Event, order.event_id)
+        max_cap = effective_max_ice_cream(new_slot, event)
+        already_booked: int = db.execute(
+            select(func.coalesce(func.sum(OrderItem.quantity), 0))
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(
+                Order.slot_id == new_slot.id,
+                Order.id != order_id,
+                Order.status != OrderStatus.cancelled,
+                OrderItem.used_ice_cream == True,
+            )
+        ).scalar_one() or 0
+        if already_booked + order_ice_cream > max_cap:
+            raise HTTPException(status_code=409, detail="הסלוט מלא")
+
+    order.slot_id = payload.slot_id
+    db.commit()
+    return _load_order_with_products(db, order_id)  # type: ignore[return-value]
 
 
 @router.post("/orders/{order_id}/cancel", response_model=OrderOut)

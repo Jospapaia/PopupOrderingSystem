@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo, type FormEvent } from "react";
-import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut } from "../../api/types";
+import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut, SlotAdminOut } from "../../api/types";
 // IceCreamMode is still needed for AddMenuItemPanel's newProduct state
 import {
   adminPublishEvent, adminCompleteEvent, adminCancelEvent, adminDeleteEvent,
   adminListMenuItems, adminAddMenuItem, adminUpdateMenuItem, adminDeleteMenuItem,
   adminReorderMenuItems, adminListProducts, adminCreateProduct, adminUpdateEvent, adminListOrders,
-  adminPickupOrder, adminCancelOrder, adminDeleteOrder, adminRemoveOrderItem, adminUpdateOrderItem, toApiError,
+  adminPickupOrder, adminCancelOrder, adminDeleteOrder, adminRemoveOrderItem, adminUpdateOrderItem,
+  adminListSlots, adminUpdateOrderSlot, toApiError,
 } from "../../api/client";
 import SlotGrid from "./SlotGrid";
 import { STATUS_LABELS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ICE_CREAM_MODES, ICE_CREAM_MODE_LABELS } from "../../utils/eventStatus";
@@ -54,6 +55,9 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editingQtys, setEditingQtys] = useState<Record<string, number>>({});
   const [slotRefreshKey, setSlotRefreshKey] = useState(0);
+  const [slots, setSlots] = useState<SlotAdminOut[]>([]);
+  const [movingSlotOrderId, setMovingSlotOrderId] = useState<string | null>(null);
+  const [movingSlotValue, setMovingSlotValue] = useState<string>("");
 
   const loadMenu = () =>
     adminListMenuItems(event.id).then(setMenuItems).catch((e: unknown) => setError(toApiError(e).message));
@@ -69,7 +73,12 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       })
       .catch((e: unknown) => setError(toApiError(e).message));
 
-  useEffect(() => { loadMenu(); loadProducts(); loadOrders(); }, [event.id]);
+  const loadSlots = () =>
+    adminListSlots(event.id).then(setSlots).catch((e: unknown) => setError(toApiError(e).message));
+
+  useEffect(() => { loadMenu(); loadProducts(); loadOrders(); loadSlots(); }, [event.id]);
+
+  const slotMap = useMemo(() => new Map(slots.map((s) => [s.id, s])), [slots]);
 
   const startEditing = () => {
     setEditForm({
@@ -259,6 +268,22 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       }
       setEditingOrderId(null);
       setSlotRefreshKey((k) => k + 1);
+    } catch (err: unknown) {
+      setError(toApiError(err).message);
+    }
+  };
+
+  const handleMoveSlot = async (orderId: string) => {
+    try {
+      const updated = await adminUpdateOrderSlot(orderId, movingSlotValue || null);
+      setAllOrders((prev) => prev.map((o) => (o.id === orderId ? updated : o)));
+      setSlotlessOrders((prev) => {
+        const without = prev.filter((o) => o.id !== orderId);
+        return updated.slot_id === null ? [...without, updated] : without;
+      });
+      setMovingSlotOrderId(null);
+      setSlotRefreshKey((k) => k + 1);
+      loadSlots();
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
@@ -561,12 +586,23 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                       </button>
                     </>
                   ) : (
-                    <button
-                      onClick={() => { setEditingQtyId(item.id); setEditingQtyValue(String(item.quantity_available)); }}
-                      className="text-xs text-caramel-500 hover:text-chocolate transition-colors font-medium"
-                    >
-                      כמות: {item.quantity_available} ✎
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { setEditingQtyId(item.id); setEditingQtyValue(String(item.quantity_available)); }}
+                        className="text-xs text-caramel-500 hover:text-chocolate transition-colors font-medium"
+                      >
+                        כמות: {item.quantity_available} ✎
+                      </button>
+                      {(() => {
+                        const ordered = productStats.orderedQty[item.id] ?? 0;
+                        const remaining = item.quantity_available - ordered;
+                        return (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${remaining <= 0 ? "bg-red-100 text-red-600" : remaining <= 3 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                            נשארו {remaining}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
               </div>
@@ -691,6 +727,52 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                           </div>
                         )}
                       </div>
+
+                      {/* Slot row */}
+                      {!isEditing && (
+                        <div className="mt-1.5 pr-8 flex items-center gap-2 flex-wrap text-xs">
+                          <span className="text-caramel-400">
+                            {order.slot_id
+                              ? `סלוט ${formatTime(slotMap.get(order.slot_id)?.slot_start ?? "")}`
+                              : "ללא סלוט"}
+                          </span>
+                          {canEdit && movingSlotOrderId === order.id ? (
+                            <>
+                              <select
+                                value={movingSlotValue}
+                                onChange={(e) => setMovingSlotValue(e.target.value)}
+                                className="border border-caramel-200 rounded-lg px-2 py-0.5 text-xs text-chocolate bg-white outline-none"
+                              >
+                                <option value="">ללא סלוט</option>
+                                {slots.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {formatTime(s.slot_start)} ({s.booked_portions}/{s.max_ice_cream_effective})
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => void handleMoveSlot(order.id)}
+                                className="bg-chocolate text-cream px-2 py-0.5 rounded-lg font-medium hover:bg-chocolate-light transition-colors"
+                              >
+                                שמור
+                              </button>
+                              <button
+                                onClick={() => setMovingSlotOrderId(null)}
+                                className="text-caramel-400 hover:text-chocolate transition-colors"
+                              >
+                                ביטול
+                              </button>
+                            </>
+                          ) : canEdit ? (
+                            <button
+                              onClick={() => { setMovingSlotOrderId(order.id); setMovingSlotValue(order.slot_id ?? ""); }}
+                              className="text-caramel-400 hover:text-chocolate transition-colors"
+                            >
+                              שנה ✎
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
 
                       {/* Items — view mode */}
                       {!isEditing && (

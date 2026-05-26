@@ -195,6 +195,9 @@ export const adminRemoveOrderItem = (itemId: string): Promise<OrderOut | null> =
 export const adminUpdateOrderItem = (itemId: string, quantity: number): Promise<OrderOut> =>
   request<OrderOut>(`/admin/order-items/${itemId}`, { method: "PATCH", body: JSON.stringify({ quantity }) }, true);
 
+export const adminUpdateOrderSlot = (orderId: string, slotId: string | null): Promise<OrderOut> =>
+  request<OrderOut>(`/admin/orders/${orderId}/slot`, { method: "PATCH", body: JSON.stringify({ slot_id: slotId }) }, true);
+
 // About page
 export const getAbout = (): Promise<AboutPageOut> =>
   request<AboutPageOut>("/about");
