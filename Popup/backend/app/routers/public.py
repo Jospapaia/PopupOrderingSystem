@@ -60,6 +60,23 @@ def _is_slot_in_past(slot_start: datetime, now: datetime) -> bool:
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 def _get_upcoming_event_data(db: Session, today: date) -> UpcomingEventResponse:
+    # Check for active survey first
+    survey_event = db.execute(
+        select(Event)
+        .where(Event.status == EventStatus.survey, Event.date >= today)
+        .order_by(Event.date.asc(), Event.created_at.asc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if survey_event is not None:
+        from datetime import timezone as _tz
+        now = datetime.now(_tz.utc)
+        ends = survey_event.survey_ends_at
+        if ends is not None:
+            ends_utc = ends if ends.tzinfo is not None else ends.replace(tzinfo=_tz.utc)
+            if now <= ends_utc:
+                return UpcomingEventResponse(event=None, survey_event_id=survey_event.id)
+
     event = db.execute(
         select(Event)
         .where(Event.status == EventStatus.published, Event.date >= today)

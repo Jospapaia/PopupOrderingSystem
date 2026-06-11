@@ -37,6 +37,7 @@ export interface UpcomingEvent {
 
 export interface UpcomingEventResponse {
   event: UpcomingEvent | null;
+  survey_event_id: string | null;
 }
 
 export interface OrderItemIn {

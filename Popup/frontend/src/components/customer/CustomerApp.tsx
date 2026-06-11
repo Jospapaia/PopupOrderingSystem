@@ -10,7 +10,13 @@ export default function CustomerApp() {
   const load = () => {
     setNetworkError(false);
     getUpcomingEvent()
-      .then((res) => setEvent(res.event))
+      .then((res) => {
+        if (res.survey_event_id) {
+          window.location.replace(`/survey/${res.survey_event_id}`);
+          return;
+        }
+        setEvent(res.event);
+      })
       .catch(() => setNetworkError(true));
   };
 

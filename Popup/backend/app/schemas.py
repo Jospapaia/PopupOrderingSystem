@@ -305,6 +305,7 @@ class UpcomingEventOut(BaseModel):
 
 class UpcomingEventResponse(BaseModel):
     event: Optional[UpcomingEventOut]
+    survey_event_id: Optional[uuid.UUID] = None
 
 
 # ── Survey ────────────────────────────────────────────────────────────────────
