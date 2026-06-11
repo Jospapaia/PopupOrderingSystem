@@ -5,7 +5,7 @@
 Full-stack order management system for a home pop-up ice cream and desserts business.
 Customers order ahead by time slot; system enforces ice cream machine capacity.
 
-**Stack:** FastAPI (Python 3.11) + PostgreSQL + SQLAlchemy + Alembic | React + Vite + Tailwind CSS | Docker Compose
+**Stack:** FastAPI (Python 3.11) + PostgreSQL + SQLAlchemy + Alembic | React + Vite + Tailwind CSS
 
 ## Directory Layout
 
@@ -20,9 +20,9 @@ backend/
     models/
       models.py       # SQLAlchemy ORM models + 3 enum types
     routers/
-      public.py       # GET /events/upcoming, POST /orders
+      public.py       # GET /events/upcoming, POST /orders, GET /events/{id}/survey, POST /events/{id}/vote
       admin.py        # All /admin/* endpoints
-  alembic/            # DB migrations (0001 initial … 0005 menu sort_order)
+  alembic/            # DB migrations (0001 initial … 0007 product defaults)
   Dockerfile
   requirements.txt
   static/uploads/     # Product + about images (served at /static/uploads/, persisted via Docker named volume)
@@ -33,13 +33,13 @@ frontend/
       client.ts       # All API calls; handles 401 → redirect to password gate
       types.ts        # TypeScript interfaces matching backend schemas
     components/
-      customer/       # CustomerApp, EventPage, ItemList, SlotPicker, OrderForm, Confirmation, AboutPage
+      customer/       # CustomerApp, EventPage, ItemList, SlotPicker, OrderForm, Confirmation, AboutPage, SurveyPage
       admin/          # AdminApp, PasswordGate, EventList, EventDetail, SlotGrid, ProductList, AboutEditor
     utils/
       format.ts       # formatTime (Asia/Jerusalem tz), formatDate, formatTimeRange
       eventStatus.ts  # STATUS_LABELS, STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS
       cart.ts         # cartItemQuantity, itemLineTotal, cartTotal, cartIceCreamPortions, needsSlotForCart
-    App.tsx           # Routes: /admin → AdminApp, /about → AboutPage, else → CustomerApp
+    App.tsx           # Routes: /admin → AdminApp, /about → AboutPage, /survey/:id → SurveyPage, else → CustomerApp
     main.tsx
     index.css         # Design system: chocolate/caramel/gold/cream/parchment, Secular One + Rubik fonts
   index.html          # lang="he" dir="rtl"
@@ -52,8 +52,8 @@ frontend/
 tests/e2e/            # Playwright tests
 playwright.config.ts
 
-docker-compose.yml    # backend + PostgreSQL (backend built via Dockerfile — rebuild after Python changes)
-.env.example          # Required env vars template
+deploy.sh / deploy.ps1  # Deploy backend to production server (SSH + git pull + docker compose)
+.env.example            # Required env vars template
 README.md             # Local setup + deployment guide
 ```
 
@@ -143,6 +143,44 @@ Singleton table `about_page` (id=1, migration 0004). Fields: `bio_text` (Text, n
   - **לפי הזמנה** — sequential numbered list; confirmed orders show "עריכה" (inline qty/remove edit) and "מחק" (hard delete).
   - **לפי מוצר** — per-menu-item remaining/available badge + buyer list aggregated from non-cancelled orders.
 
+### Survey Stage (optional, migration 0006–0007)
+
+The survey is an **optional** step between `draft` and `published`. The full lifecycle is:
+
+- **Without survey:** `draft → published → completed`
+- **With survey:** `draft → survey → published → completed`
+
+#### Activating a survey
+Admin clicks "פתח סקר" on a draft event and configures:
+- `survey_ends_at` — deadline (DateTime, must be in the future)
+- `menu_size` — how many products the survey selects (does **not** include fixed products)
+- `fixed_product_ids` — products guaranteed in the menu regardless of votes; excluded from the voting UI
+
+Event moves to `survey` status. A share link for voters: `/survey/{event_id}`.
+
+#### Voting (public, no auth)
+`GET /events/{id}/survey` — returns event info + all products excluding fixed ones.
+`POST /events/{id}/vote` — `{ voter_name, browser_token, product_ids[] }`. Voter can choose up to `menu_size` products. Re-voting from the same `browser_token` replaces previous votes. `browser_token` is a UUID stored in `localStorage` per event (soft deduplication, trust-based). `SurveyPage.tsx` marks voted state in `localStorage` so the UI shows a confirmation on return.
+
+#### Finalizing
+Admin clicks "סיים סקר ופרסם". `POST /admin/events/{id}/finalize_survey` (no body):
+1. Loads fixed products + top-voted products (up to `menu_size`, excluding fixed)
+2. Creates `event_menu_items` using each product's `default_price` and `default_quantity` (fallback: price=0, qty=10)
+3. Generates slots (same algorithm as normal publish)
+4. Sets status = `published`
+
+After publishing, admin can edit prices/quantities via the normal menu tab.
+
+#### Product defaults (migration 0007)
+`products.default_quantity` (Integer, nullable) and `products.default_price` (Numeric, nullable) — set per product in ProductList. Used only when finalizing a survey. Shown as hints in the product list UI.
+
+#### DB tables
+- `survey_votes`: `id, event_id, voter_name, browser_token, product_id, created_at`. Unique on `(event_id, browser_token, product_id)`.
+- `survey_fixed_products`: `id, event_id, product_id`. Unique on `(event_id, product_id)`. Cascade-deleted with event.
+
+#### Admin survey results
+`GET /admin/events/{id}/survey/results` — vote counts per product, total unique voters, which are fixed. Shown live in `EventDetail` while status = `survey` with a refresh button.
+
 ## Admin Auth
 All `/admin/*` routes require `Authorization: Bearer {ADMIN_PASSWORD}`.
 Password is `os.environ["ADMIN_PASSWORD"]` — never hardcoded.
@@ -151,23 +189,35 @@ Frontend stores password in `localStorage` and clears it on 401.
 ## UI Language
 All user-facing text is in **Hebrew (RTL)**. `lang="he"` `dir="rtl"` on `<html>`.
 
-## Running Locally
+## Running Frontend Locally
 ```bash
-docker-compose up -d        # starts backend + PostgreSQL (runs migrations)
-curl http://localhost:8002/health  # verify
-cd frontend && npm install && npm run dev  # customer + admin UI
+cd frontend && npm install && npm run dev
 ```
+
+## Deployment
+
+### Frontend
+Deployed automatically via Vercel on every push to `main`. No manual step needed.
+
+### Backend
+Backend runs on `root@178.105.141.67` at `/app/Popup`. Deploy with either script:
+
+```bash
+# From Linux/Mac/Git Bash:
+./deploy.sh
+
+# From PowerShell:
+./deploy.ps1
+```
+
+Both scripts: SSH to server → `git pull` → `docker compose up -d --build backend` → health check at `https://api.yossiscookies.store/health`.
+
+After any Python/backend change: commit + push, then run the deploy script.
 
 ## Running E2E Tests
 ```bash
-# Requires running frontend (npm run dev) and backend (docker-compose up)
+# Requires running frontend (npm run dev) and a reachable backend
 npx playwright test
-```
-
-## After Python/backend changes
-The backend runs inside Docker and code is COPY-ed into the image — file edits on the host are NOT picked up automatically.
-```bash
-docker-compose build backend && docker-compose up -d backend
 ```
 
 ## QA Skill

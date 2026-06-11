@@ -1,5 +1,5 @@
 export type IceCreamMode = "none" | "included" | "optional";
-export type EventStatus = "draft" | "published" | "completed" | "cancelled";
+export type EventStatus = "draft" | "survey" | "published" | "completed" | "cancelled";
 export type OrderStatus = "confirmed" | "picked_up" | "cancelled";
 
 export interface SlotPublic {
@@ -80,6 +80,8 @@ export interface ProductOut {
   description: string | null;
   ice_cream_mode: IceCreamMode;
   image_url: string | null;
+  default_quantity: number | null;
+  default_price: number | null;
   created_at: string;
 }
 
@@ -94,8 +96,61 @@ export interface EventOut {
   max_ice_cream_per_slot: number;
   max_ice_cream_total: number | null;
   status: EventStatus;
+  survey_ends_at: string | null;
+  menu_size: number | null;
   created_at: string;
 }
+
+export interface SurveyProduct {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  ice_cream_mode: IceCreamMode;
+}
+
+export interface SurveyPublicOut {
+  id: string;
+  title: string;
+  description: string | null;
+  date: string;
+  survey_ends_at: string;
+  menu_size: number;
+  products: SurveyProduct[];
+}
+
+export interface SurveyResultItem {
+  product_id: string;
+  product_name: string;
+  vote_count: number;
+  is_fixed: boolean;
+}
+
+export interface SurveyResultsOut {
+  results: SurveyResultItem[];
+  total_voters: number;
+  survey_ends_at: string;
+  menu_size: number;
+}
+
+export interface SurveyFixedProductOut {
+  id: string;
+  product_id: string;
+  product: SurveyProduct;
+}
+
+export interface SurveyStartPayload {
+  survey_ends_at: string;
+  menu_size: number;
+  fixed_product_ids: string[];
+}
+
+export interface SurveyVotePayload {
+  voter_name: string;
+  browser_token: string;
+  product_ids: string[];
+}
+
 
 export interface OrderItemSummary {
   product_name: string;
@@ -169,6 +224,8 @@ export interface ProductCreatePayload {
   name: string;
   description?: string;
   ice_cream_mode: IceCreamMode;
+  default_quantity?: number | null;
+  default_price?: number | null;
 }
 
 export interface ProductUpdatePayload {
@@ -176,6 +233,8 @@ export interface ProductUpdatePayload {
   description?: string;
   ice_cream_mode?: IceCreamMode;
   image_url?: string | null;
+  default_quantity?: number | null;
+  default_price?: number | null;
 }
 
 export interface AboutPageOut {

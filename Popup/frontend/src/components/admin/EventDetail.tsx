@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, type FormEvent } from "react";
-import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut, SlotAdminOut } from "../../api/types";
+import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut, SlotAdminOut, SurveyResultsOut, SurveyFixedProductOut } from "../../api/types";
 // IceCreamMode is still needed for AddMenuItemPanel's newProduct state
 import {
   adminPublishEvent, adminCompleteEvent, adminCancelEvent, adminDeleteEvent,
@@ -7,9 +7,11 @@ import {
   adminReorderMenuItems, adminListProducts, adminCreateProduct, adminUpdateEvent, adminListOrders,
   adminPickupOrder, adminCancelOrder, adminDeleteOrder, adminRemoveOrderItem, adminUpdateOrderItem,
   adminListSlots, adminUpdateOrderSlot, toApiError,
+  adminStartSurvey, adminGetSurveyResults, adminFinalizeSurvey,
+  adminListSurveyFixed,
 } from "../../api/client";
 import SlotGrid from "./SlotGrid";
-import { STATUS_LABELS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ICE_CREAM_MODES, ICE_CREAM_MODE_LABELS } from "../../utils/eventStatus";
+import { STATUS_LABELS, STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ICE_CREAM_MODES, ICE_CREAM_MODE_LABELS } from "../../utils/eventStatus";
 import { formatDate, formatTimeRange, formatTime } from "../../utils/format";
 
 interface Props {
@@ -59,6 +61,11 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [movingSlotOrderId, setMovingSlotOrderId] = useState<string | null>(null);
   const [movingSlotValue, setMovingSlotValue] = useState<string>("");
 
+  // Survey state
+  const [showStartSurvey, setShowStartSurvey] = useState(false);
+  const [surveyResults, setSurveyResults] = useState<SurveyResultsOut | null>(null);
+  const [surveyFixed, setSurveyFixed] = useState<SurveyFixedProductOut[]>([]);
+
   const loadMenu = () =>
     adminListMenuItems(event.id).then(setMenuItems).catch((e: unknown) => setError(toApiError(e).message));
 
@@ -76,7 +83,13 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const loadSlots = () =>
     adminListSlots(event.id).then(setSlots).catch((e: unknown) => setError(toApiError(e).message));
 
-  useEffect(() => { loadMenu(); loadProducts(); loadOrders(); loadSlots(); }, [event.id]);
+  useEffect(() => {
+    loadMenu(); loadProducts(); loadOrders(); loadSlots();
+    if (event.status === "survey") {
+      adminGetSurveyResults(event.id).then(setSurveyResults).catch(() => null);
+      adminListSurveyFixed(event.id).then(setSurveyFixed).catch(() => null);
+    }
+  }, [event.id, event.status]);
 
   const slotMap = useMemo(() => new Map(slots.map((s) => [s.id, s])), [slots]);
 
@@ -289,6 +302,18 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
     }
   };
 
+  const handleFinalizeSurvey = async () => {
+    if (!window.confirm("לסיים את הסקר ולפרסם את האירוע? פעולה זו אינה ניתנת לביטול.")) return;
+    setError(null);
+    try {
+      const result = await adminFinalizeSurvey(event.id);
+      setEvent(result);
+      onAction();
+    } catch (err: unknown) {
+      setError(toApiError(err).message);
+    }
+  };
+
   const handleDrop = async (targetIdx: number) => {
     if (dragSrcIdx === null || dragSrcIdx === targetIdx) {
       setDragSrcIdx(null); setDragOverIdx(null);
@@ -348,12 +373,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
               <p className="text-caramel-600 text-sm mt-1.5 leading-relaxed">{event.description}</p>
             )}
           </div>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${
-            event.status === "draft" ? "bg-caramel-100 text-caramel-600" :
-            event.status === "published" ? "bg-green-100 text-green-700" :
-            event.status === "completed" ? "bg-blue-100 text-blue-700" :
-            "bg-red-100 text-red-600"
-          }`}>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium shrink-0 ${STATUS_COLORS[event.status]}`}>
             {STATUS_LABELS[event.status]}
           </span>
         </div>
@@ -376,11 +396,21 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                   className="bg-pistachio text-white px-3 py-1.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
                   פרסם אירוע
                 </button>
+                <button onClick={() => setShowStartSurvey(true)}
+                  className="bg-purple-100 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-xl text-sm font-semibold hover:bg-purple-200 transition-colors">
+                  פתח סקר
+                </button>
                 <button onClick={handleCancel}
                   className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-xl text-sm font-semibold hover:bg-amber-100 transition-colors">
                   בטל אירוע
                 </button>
               </>
+            )}
+            {event.status === "survey" && (
+              <button onClick={handleFinalizeSurvey}
+                className="bg-pistachio text-white px-3 py-1.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                סיים סקר ופרסם
+              </button>
             )}
             {event.status === "published" && (
               <>
@@ -472,6 +502,66 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
           </div>
         )}
       </div>
+
+      {/* Start Survey Panel */}
+      {showStartSurvey && (
+        <StartSurveyPanel
+          event={event}
+          products={products}
+          onDone={(updatedEvent) => {
+            setEvent(updatedEvent);
+            setShowStartSurvey(false);
+            onAction();
+            adminGetSurveyResults(updatedEvent.id).then(setSurveyResults).catch(() => null);
+            adminListSurveyFixed(updatedEvent.id).then(setSurveyFixed).catch(() => null);
+          }}
+          onCancel={() => setShowStartSurvey(false)}
+          onError={setError}
+        />
+      )}
+
+      {/* Survey Results */}
+      {event.status === "survey" && surveyResults && (
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 mb-5">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-display font-bold text-purple-800">תוצאות סקר</h3>
+            <div className="text-xs text-purple-600">
+              {surveyResults.total_voters} מצביעים · נסגר {new Date(surveyResults.survey_ends_at).toLocaleString("he-IL")}
+            </div>
+          </div>
+          <p className="text-xs text-purple-600 mb-3">
+            {surveyResults.menu_size} מנות ייבחרו מהסקר + {surveyFixed.length} קבועות
+          </p>
+          <div className="space-y-1.5">
+            {surveyResults.results.length === 0 && (
+              <p className="text-xs text-purple-400">אין הצבעות עדיין</p>
+            )}
+            {surveyResults.results.map((r, idx) => (
+              <div key={r.product_id} className={`flex items-center gap-2 text-sm ${idx < surveyResults.menu_size ? "text-purple-800 font-medium" : "text-purple-500"}`}>
+                <span className="w-5 text-center text-xs">{idx + 1}</span>
+                <span className="flex-1">{r.product_name}</span>
+                <span className="text-xs bg-purple-100 px-2 py-0.5 rounded-full">{r.vote_count} קולות</span>
+                {idx < surveyResults.menu_size && (
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">ייכנס</span>
+                )}
+              </div>
+            ))}
+            {surveyFixed.map((fp) => (
+              <div key={fp.id} className="flex items-center gap-2 text-sm text-purple-800 font-medium">
+                <span className="w-5 text-center text-xs">★</span>
+                <span className="flex-1">{fp.product.name}</span>
+                <span className="text-xs bg-purple-200 text-purple-700 px-2 py-0.5 rounded-full">קבועה</span>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={() => adminGetSurveyResults(event.id).then(setSurveyResults).catch(() => null)}
+            className="mt-3 text-xs text-purple-600 hover:text-purple-800 transition-colors"
+          >
+            רענן תוצאות
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 mb-5">
@@ -883,6 +973,107 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
         </div>
       )}
     </div>
+  );
+}
+
+interface StartSurveyPanelProps {
+  event: EventOut;
+  products: ProductOut[];
+  onDone: (e: EventOut) => void;
+  onCancel: () => void;
+  onError: (msg: string) => void;
+}
+
+function StartSurveyPanel({ event, products, onDone, onCancel, onError }: StartSurveyPanelProps) {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const defaultDate = tomorrow.toISOString().slice(0, 16);
+
+  const [endsAt, setEndsAt] = useState(defaultDate);
+  const [menuSize, setMenuSize] = useState("3");
+  const [fixedIds, setFixedIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const toggleFixed = (id: string) => {
+    setFixedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const result = await adminStartSurvey(event.id, {
+        survey_ends_at: new Date(endsAt).toISOString(),
+        menu_size: parseInt(menuSize),
+        fixed_product_ids: fixedIds,
+      });
+      onDone(result);
+    } catch (err: unknown) {
+      onError(toApiError(err).message);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}
+      className="bg-purple-50 border border-purple-200 rounded-2xl p-4 mb-5 text-sm space-y-4">
+      <h3 className="font-display font-bold text-purple-800">הגדרת סקר</h3>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2">
+          <label className="block text-xs font-semibold text-purple-700 mb-1">סקר פעיל עד</label>
+          <input
+            type="datetime-local"
+            value={endsAt}
+            onChange={(e) => setEndsAt(e.target.value)}
+            required
+            className="w-full bg-white border-2 border-purple-200 focus:border-purple-500 rounded-xl px-3 py-2 text-sm text-chocolate outline-none transition-colors"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-purple-700 mb-1">כמות מנות מהסקר</label>
+          <input
+            type="number"
+            min="1"
+            value={menuSize}
+            onChange={(e) => setMenuSize(e.target.value)}
+            required
+            className="w-full bg-white border-2 border-purple-200 focus:border-purple-500 rounded-xl px-3 py-2 text-sm text-chocolate outline-none transition-colors"
+          />
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-purple-700 mb-2">מנות קבועות (לא יופיעו בסקר)</p>
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          {products.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={fixedIds.includes(p.id)}
+                onChange={() => toggleFixed(p.id)}
+                className="accent-purple-600"
+              />
+              <span className="text-chocolate">{p.name}</span>
+              <span className="text-caramel-400 text-xs">{ICE_CREAM_MODE_LABELS[p.ice_cream_mode]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <button type="submit" disabled={saving}
+          className="bg-purple-600 text-white px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+          {saving ? "פותח סקר..." : "פתח סקר"}
+        </button>
+        <button type="button" onClick={onCancel} disabled={saving}
+          className="bg-white border border-purple-200 text-purple-700 px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-purple-100 transition-colors">
+          ביטול
+        </button>
+      </div>
+    </form>
   );
 }
 

@@ -11,12 +11,13 @@ from sqlalchemy.orm import Session, selectinload
 from ..database import get_db
 from ..models.models import (
     Event, Slot, EventMenuItem, Order, OrderItem, Product, AboutPage,
-    EventStatus, OrderStatus, IceCreamMode,
+    EventStatus, OrderStatus, IceCreamMode, SurveyFixedProduct, SurveyVote,
 )
 from ..queries import booked_portions, item_booked, effective_max_ice_cream, ice_cream_count_for_item
 from ..schemas import (
     OrderCreate, OrderOut, OrderItemIn, UpcomingEventResponse, UpcomingEventOut,
     SlotPublicOut, EventMenuItemPublicOut, AboutPageOut,
+    SurveyPublicOut, SurveyProductOut, SurveyVoteCreate,
 )
 
 router = APIRouter()
@@ -241,6 +242,116 @@ def _create_order(db: Session, payload: OrderCreate, now: datetime) -> OrderOut:
         .where(Order.id == order.id)
     ).scalar_one()
     return loaded
+
+
+@router.get("/events/{event_id}/survey", response_model=SurveyPublicOut)
+def get_survey(event_id: uuid.UUID, db: Session = Depends(get_db)) -> SurveyPublicOut:
+    event = db.get(Event, event_id)
+    if event is None or event.status != EventStatus.survey:
+        raise HTTPException(status_code=404, detail="הסקר לא נמצא או שאינו פעיל")
+    if event.survey_ends_at is None or event.menu_size is None:
+        raise HTTPException(status_code=500, detail="נתוני סקר חסרים")
+
+    from datetime import timezone as _tz
+    now = datetime.now(_tz.utc)
+    survey_ends_utc = (
+        event.survey_ends_at
+        if event.survey_ends_at.tzinfo is not None
+        else event.survey_ends_at.replace(tzinfo=_tz.utc)
+    )
+    if now > survey_ends_utc:
+        raise HTTPException(status_code=410, detail="הסקר הסתיים")
+
+    fixed_ids: set[uuid.UUID] = {
+        fp.product_id for fp in db.execute(
+            select(SurveyFixedProduct).where(SurveyFixedProduct.event_id == event_id)
+        ).scalars().all()
+    }
+
+    products = db.execute(
+        select(Product).order_by(Product.created_at.asc())
+    ).scalars().all()
+
+    votable = [
+        SurveyProductOut(
+            id=p.id,
+            name=p.name,
+            description=p.description,
+            image_url=p.image_url,
+            ice_cream_mode=p.ice_cream_mode,
+        )
+        for p in products
+        if p.id not in fixed_ids
+    ]
+
+    return SurveyPublicOut(
+        id=event.id,
+        title=event.title,
+        description=event.description,
+        date=event.date,
+        survey_ends_at=event.survey_ends_at,
+        menu_size=event.menu_size,
+        products=votable,
+    )
+
+
+@router.post("/events/{event_id}/vote", status_code=201)
+def submit_vote(event_id: uuid.UUID, payload: SurveyVoteCreate, db: Session = Depends(get_db)) -> dict:
+    from datetime import timezone as _tz
+    event = db.get(Event, event_id)
+    if event is None or event.status != EventStatus.survey:
+        raise HTTPException(status_code=404, detail="הסקר לא נמצא או שאינו פעיל")
+
+    survey_ends_utc = (
+        event.survey_ends_at
+        if event.survey_ends_at.tzinfo is not None
+        else event.survey_ends_at.replace(tzinfo=_tz.utc)
+    )
+    if datetime.now(_tz.utc) > survey_ends_utc:
+        raise HTTPException(status_code=410, detail="הסקר הסתיים")
+
+    if not payload.product_ids:
+        raise HTTPException(status_code=400, detail="יש לבחור לפחות מוצר אחד")
+
+    menu_size = event.menu_size or 1
+    if len(payload.product_ids) > menu_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ניתן לבחור עד {menu_size} מוצרים",
+        )
+
+    fixed_ids: set[uuid.UUID] = {
+        fp.product_id for fp in db.execute(
+            select(SurveyFixedProduct).where(SurveyFixedProduct.event_id == event_id)
+        ).scalars().all()
+    }
+
+    for pid in payload.product_ids:
+        if pid in fixed_ids:
+            raise HTTPException(status_code=400, detail="לא ניתן להצביע למנה קבועה")
+        if db.get(Product, pid) is None:
+            raise HTTPException(status_code=404, detail=f"המוצר {pid} לא נמצא")
+
+    # Remove previous votes from this browser_token for this event (re-vote allowed)
+    existing = db.execute(
+        select(SurveyVote).where(
+            SurveyVote.event_id == event_id,
+            SurveyVote.browser_token == payload.browser_token,
+        )
+    ).scalars().all()
+    for v in existing:
+        db.delete(v)
+
+    for pid in payload.product_ids:
+        db.add(SurveyVote(
+            event_id=event_id,
+            voter_name=payload.voter_name,
+            browser_token=payload.browser_token,
+            product_id=pid,
+        ))
+
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/about", response_model=AboutPageOut)

@@ -21,6 +21,7 @@ class IceCreamMode(str, enum.Enum):
 
 class EventStatus(str, enum.Enum):
     draft = "draft"
+    survey = "survey"
     published = "published"
     completed = "completed"
     cancelled = "cancelled"
@@ -48,6 +49,8 @@ class Product(Base):
         default=IceCreamMode.none,
     )
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    default_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    default_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     event_menu_items = relationship("EventMenuItem", back_populates="product")
@@ -70,11 +73,15 @@ class Event(Base):
         nullable=False,
         default=EventStatus.draft,
     )
+    survey_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    menu_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     slots = relationship("Slot", back_populates="event", cascade="all, delete-orphan")
     menu_items = relationship("EventMenuItem", back_populates="event", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="event")
+    survey_fixed_products = relationship("SurveyFixedProduct", back_populates="event", cascade="all, delete-orphan")
+    survey_votes = relationship("SurveyVote", back_populates="event", cascade="all, delete-orphan")
 
 
 class Slot(Base):
@@ -146,6 +153,40 @@ class AboutPage(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     bio_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
+
+
+class SurveyFixedProduct(Base):
+    __tablename__ = "survey_fixed_products"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+
+    event = relationship("Event", back_populates="survey_fixed_products")
+    product = relationship("Product")
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "product_id", name="uq_survey_fixed_event_product"),
+    )
+
+
+class SurveyVote(Base):
+    __tablename__ = "survey_votes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
+    voter_name: Mapped[str] = mapped_column(String, nullable=False)
+    browser_token: Mapped[str] = mapped_column(String, nullable=False)
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    event = relationship("Event", back_populates="survey_votes")
+    product = relationship("Product")
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "browser_token", "product_id", name="uq_survey_vote_token_product"),
+        Index("ix_survey_votes_event_id", "event_id"),
+    )
 
 
 class OrderItem(Base):

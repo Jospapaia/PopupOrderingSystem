@@ -5,6 +5,8 @@ import type {
   ProductCreatePayload, ProductUpdatePayload,
   MenuItemCreatePayload, MenuItemUpdatePayload,
   AboutPageOut, AboutPageUpdatePayload,
+  SurveyPublicOut, SurveyVotePayload, SurveyResultsOut,
+  SurveyFixedProductOut, SurveyStartPayload,
 } from "./types";
 
 export const BASE = import.meta.env.VITE_API_URL ?? "";
@@ -197,6 +199,32 @@ export const adminUpdateOrderItem = (itemId: string, quantity: number): Promise<
 
 export const adminUpdateOrderSlot = (orderId: string, slotId: string | null): Promise<OrderOut> =>
   request<OrderOut>(`/admin/orders/${orderId}/slot`, { method: "PATCH", body: JSON.stringify({ slot_id: slotId }) }, true);
+
+// Survey — public
+export const getSurvey = (eventId: string): Promise<SurveyPublicOut> =>
+  request<SurveyPublicOut>(`/events/${eventId}/survey`);
+
+export const submitVote = (eventId: string, payload: SurveyVotePayload): Promise<void> =>
+  request<void>(`/events/${eventId}/vote`, { method: "POST", body: JSON.stringify(payload) });
+
+// Survey — admin
+export const adminStartSurvey = (eventId: string, payload: SurveyStartPayload): Promise<EventOut> =>
+  request<EventOut>(`/admin/events/${eventId}/start_survey`, { method: "POST", body: JSON.stringify(payload) }, true);
+
+export const adminGetSurveyResults = (eventId: string): Promise<SurveyResultsOut> =>
+  request<SurveyResultsOut>(`/admin/events/${eventId}/survey/results`, {}, true);
+
+export const adminListSurveyFixed = (eventId: string): Promise<SurveyFixedProductOut[]> =>
+  request<SurveyFixedProductOut[]>(`/admin/events/${eventId}/survey/fixed`, {}, true);
+
+export const adminAddSurveyFixed = (eventId: string, productId: string): Promise<SurveyFixedProductOut> =>
+  request<SurveyFixedProductOut>(`/admin/events/${eventId}/survey/fixed`, { method: "POST", body: JSON.stringify({ product_id: productId }) }, true);
+
+export const adminRemoveSurveyFixed = (eventId: string, productId: string): Promise<void> =>
+  request<void>(`/admin/events/${eventId}/survey/fixed/${productId}`, { method: "DELETE" }, true);
+
+export const adminFinalizeSurvey = (eventId: string): Promise<EventOut> =>
+  request<EventOut>(`/admin/events/${eventId}/finalize_survey`, { method: "POST" }, true);
 
 // About page
 export const getAbout = (): Promise<AboutPageOut> =>

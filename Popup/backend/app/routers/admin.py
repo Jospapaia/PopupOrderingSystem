@@ -17,7 +17,7 @@ from ..database import get_db
 from ..auth import require_admin
 from ..models.models import (
     Event, Slot, EventMenuItem, Order, OrderItem, Product, AboutPage,
-    EventStatus, OrderStatus, IceCreamMode,
+    EventStatus, OrderStatus, IceCreamMode, SurveyFixedProduct, SurveyVote,
 )
 from ..queries import booked_portions, item_booked, effective_max_ice_cream
 from ..schemas import (
@@ -26,6 +26,8 @@ from ..schemas import (
     SlotUpdate, SlotAdminOut, OrderSummary, OrderItemSummary,
     EventMenuItemCreate, EventMenuItemUpdate, EventMenuItemOut, MenuItemReorderPayload,
     OrderOut, OrderItemUpdate, OrderSlotUpdate, AboutPageOut, AboutPageUpdate,
+    SurveyStartPayload, SurveyProductOut, SurveyFixedProductOut, SurveyFixedProductAdd,
+    SurveyResultItemOut, SurveyResultsOut,
 )
 
 router = APIRouter(prefix="/admin", dependencies=[Depends(require_admin)])
@@ -375,6 +377,213 @@ def cancel_event(event_id: uuid.UUID, db: Session = Depends(get_db)) -> EventOut
     if event.status == EventStatus.cancelled:
         raise HTTPException(status_code=409, detail="האירוע כבר בוטל")
     event.status = EventStatus.cancelled
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+# ── Survey ────────────────────────────────────────────────────────────────────
+
+@router.post("/events/{event_id}/start_survey", response_model=EventOut)
+def start_survey(event_id: uuid.UUID, payload: SurveyStartPayload, db: Session = Depends(get_db)) -> EventOut:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    if event.status != EventStatus.draft:
+        raise HTTPException(status_code=409, detail="ניתן לפתוח סקר רק לאירועים בסטטוס טיוטה")
+
+    # Validate fixed products exist
+    for pid in payload.fixed_product_ids:
+        if db.get(Product, pid) is None:
+            raise HTTPException(status_code=404, detail=f"המוצר {pid} לא נמצא")
+
+    # Remove any previous fixed-product entries for this event (idempotent re-start)
+    db.execute(
+        select(SurveyFixedProduct).where(SurveyFixedProduct.event_id == event_id)
+    )
+    existing = db.execute(
+        select(SurveyFixedProduct).where(SurveyFixedProduct.event_id == event_id)
+    ).scalars().all()
+    for fp in existing:
+        db.delete(fp)
+
+    for pid in payload.fixed_product_ids:
+        db.add(SurveyFixedProduct(event_id=event_id, product_id=pid))
+
+    event.survey_ends_at = payload.survey_ends_at
+    event.menu_size = payload.menu_size
+    event.status = EventStatus.survey
+    db.commit()
+    db.refresh(event)
+    return event
+
+
+@router.get("/events/{event_id}/survey/fixed", response_model=List[SurveyFixedProductOut])
+def list_survey_fixed(event_id: uuid.UUID, db: Session = Depends(get_db)) -> List[SurveyFixedProductOut]:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    items = db.execute(
+        select(SurveyFixedProduct)
+        .options(selectinload(SurveyFixedProduct.product))
+        .where(SurveyFixedProduct.event_id == event_id)
+    ).scalars().all()
+    return items
+
+
+@router.post("/events/{event_id}/survey/fixed", response_model=SurveyFixedProductOut, status_code=201)
+def add_survey_fixed(event_id: uuid.UUID, payload: SurveyFixedProductAdd, db: Session = Depends(get_db)) -> SurveyFixedProductOut:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    if event.status != EventStatus.survey:
+        raise HTTPException(status_code=409, detail="ניתן לנהל מנות קבועות רק בזמן סקר")
+    product = db.get(Product, payload.product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="המוצר לא נמצא")
+    fp = SurveyFixedProduct(event_id=event_id, product_id=payload.product_id)
+    db.add(fp)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="המוצר כבר מוגדר כקבוע")
+    db.refresh(fp)
+    db.refresh(fp.product)
+    return fp
+
+
+@router.delete("/events/{event_id}/survey/fixed/{product_id}", status_code=204, response_model=None)
+def remove_survey_fixed(event_id: uuid.UUID, product_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+    fp = db.execute(
+        select(SurveyFixedProduct).where(
+            SurveyFixedProduct.event_id == event_id,
+            SurveyFixedProduct.product_id == product_id,
+        )
+    ).scalar_one_or_none()
+    if fp is None:
+        raise HTTPException(status_code=404, detail="המוצר לא נמצא ברשימת הקבועים")
+    db.delete(fp)
+    db.commit()
+
+
+@router.get("/events/{event_id}/survey/results", response_model=SurveyResultsOut)
+def get_survey_results(event_id: uuid.UUID, db: Session = Depends(get_db)) -> SurveyResultsOut:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    if event.status not in (EventStatus.survey, EventStatus.draft, EventStatus.published):
+        raise HTTPException(status_code=409, detail="אין תוצאות סקר לאירוע זה")
+    if event.survey_ends_at is None:
+        raise HTTPException(status_code=409, detail="האירוע לא עבר שלב סקר")
+
+    fixed_ids: set[uuid.UUID] = {
+        fp.product_id for fp in db.execute(
+            select(SurveyFixedProduct).where(SurveyFixedProduct.event_id == event_id)
+        ).scalars().all()
+    }
+
+    vote_counts = db.execute(
+        select(SurveyVote.product_id, func.count(SurveyVote.id).label("cnt"))
+        .where(SurveyVote.event_id == event_id)
+        .group_by(SurveyVote.product_id)
+        .order_by(func.count(SurveyVote.id).desc())
+    ).all()
+
+    total_voters: int = db.execute(
+        select(func.count(func.distinct(SurveyVote.browser_token)))
+        .where(SurveyVote.event_id == event_id)
+    ).scalar_one()
+
+    results: list[SurveyResultItemOut] = []
+    for row in vote_counts:
+        product = db.get(Product, row.product_id)
+        if product is None:
+            continue
+        results.append(SurveyResultItemOut(
+            product_id=row.product_id,
+            product_name=product.name,
+            vote_count=row.cnt,
+            is_fixed=row.product_id in fixed_ids,
+        ))
+
+    return SurveyResultsOut(
+        results=results,
+        total_voters=total_voters,
+        survey_ends_at=event.survey_ends_at,
+        menu_size=event.menu_size or 0,
+    )
+
+
+@router.post("/events/{event_id}/finalize_survey", response_model=EventOut)
+def finalize_survey(event_id: uuid.UUID, db: Session = Depends(get_db)) -> EventOut:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    if event.status != EventStatus.survey:
+        raise HTTPException(status_code=409, detail="ניתן לסיים סקר רק לאירועים בשלב סקר")
+
+    existing_slots = db.execute(
+        select(func.count(Slot.id)).where(Slot.event_id == event_id)
+    ).scalar_one()
+    if existing_slots:
+        raise HTTPException(status_code=409, detail="לאירוע כבר יש סלוטים")
+
+    menu_size = event.menu_size or 0
+
+    fixed_products = db.execute(
+        select(SurveyFixedProduct)
+        .options(selectinload(SurveyFixedProduct.product))
+        .where(SurveyFixedProduct.event_id == event_id)
+    ).scalars().all()
+    fixed_ids = {fp.product_id for fp in fixed_products}
+
+    # Top-voted products (excluding fixed), limited to menu_size
+    vote_rows = db.execute(
+        select(SurveyVote.product_id, func.count(SurveyVote.id).label("cnt"))
+        .where(SurveyVote.event_id == event_id, SurveyVote.product_id.not_in(fixed_ids) if fixed_ids else True)
+        .group_by(SurveyVote.product_id)
+        .order_by(func.count(SurveyVote.id).desc())
+        .limit(menu_size)
+    ).all()
+
+    voted_products = []
+    for row in vote_rows:
+        p = db.get(Product, row.product_id)
+        if p is not None:
+            voted_products.append(p)
+
+    # Build final ordered list: fixed first, then voted
+    all_products: list[Product] = [fp.product for fp in fixed_products] + voted_products
+
+    if not all_products:
+        raise HTTPException(status_code=409, detail="אין מוצרים לבניית תפריט — ודא שיש הצבעות או מנות קבועות")
+
+    for idx, product in enumerate(all_products):
+        emi = EventMenuItem(
+            event_id=event_id,
+            product_id=product.id,
+            quantity_available=product.default_quantity or 10,
+            price=product.default_price or Decimal("0"),
+            ice_cream_addon_price=None,
+            sort_order=idx,
+        )
+        db.add(emi)
+
+    try:
+        slots = _generate_slot_objects(
+            event.date, event.start_time, event.end_time, event.slot_duration_min, event.id
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=409,
+            detail="טווח הזמן אינו מתחלק בשווה — שנה את משך הסלוט או שעות הפעילות",
+        )
+
+    for slot in slots:
+        db.add(slot)
+
+    event.status = EventStatus.published
     db.commit()
     db.refresh(event)
     return event

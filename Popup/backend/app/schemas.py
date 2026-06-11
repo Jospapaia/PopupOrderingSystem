@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.functional_serializers import PlainSerializer
 
 from .models.models import IceCreamMode, EventStatus, OrderStatus
+from datetime import timezone as _tz
 
 # Decimal that serializes as a JSON number (float) so frontend receives numeric values.
 # Python-side precision stays Decimal; only the JSON output converts to float.
@@ -20,6 +21,8 @@ class ProductCreate(BaseModel):
     description: Optional[str] = None
     ice_cream_mode: IceCreamMode = IceCreamMode.none
     image_url: Optional[str] = None
+    default_quantity: Optional[int] = Field(None, ge=1)
+    default_price: Optional[Decimal] = None
 
 
 class ProductUpdate(BaseModel):
@@ -27,6 +30,8 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     ice_cream_mode: Optional[IceCreamMode] = None
     image_url: Optional[str] = None
+    default_quantity: Optional[int] = Field(None, ge=1)
+    default_price: Optional[Decimal] = None
 
 
 class ProductOut(BaseModel):
@@ -35,6 +40,8 @@ class ProductOut(BaseModel):
     description: Optional[str]
     ice_cream_mode: IceCreamMode
     image_url: Optional[str]
+    default_quantity: Optional[int] = None
+    default_price: Optional[DecimalAsFloat] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -95,6 +102,8 @@ class EventOut(BaseModel):
     max_ice_cream_per_slot: int
     max_ice_cream_total: Optional[int] = None
     status: EventStatus
+    survey_ends_at: Optional[datetime] = None
+    menu_size: Optional[int] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -296,3 +305,88 @@ class UpcomingEventOut(BaseModel):
 
 class UpcomingEventResponse(BaseModel):
     event: Optional[UpcomingEventOut]
+
+
+# ── Survey ────────────────────────────────────────────────────────────────────
+
+class SurveyStartPayload(BaseModel):
+    survey_ends_at: datetime
+    menu_size: int = Field(..., ge=1)
+    fixed_product_ids: List[uuid.UUID] = []
+
+    @field_validator("survey_ends_at")
+    @classmethod
+    def ends_in_future(cls, v: datetime) -> datetime:
+        now = datetime.now(_tz.utc)
+        v_utc = v if v.tzinfo is not None else v.replace(tzinfo=_tz.utc)
+        if v_utc <= now:
+            raise ValueError("survey_ends_at must be in the future")
+        return v
+
+
+class SurveyProductOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    ice_cream_mode: IceCreamMode
+
+    model_config = {"from_attributes": True}
+
+
+class SurveyFixedProductOut(BaseModel):
+    id: uuid.UUID
+    product_id: uuid.UUID
+    product: SurveyProductOut
+
+    model_config = {"from_attributes": True}
+
+
+class SurveyPublicOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    description: Optional[str] = None
+    date: _Date
+    survey_ends_at: datetime
+    menu_size: int
+    products: List[SurveyProductOut]
+
+
+class SurveyVoteCreate(BaseModel):
+    voter_name: str = Field(..., min_length=1, max_length=100)
+    browser_token: str = Field(..., min_length=1, max_length=200)
+    product_ids: List[uuid.UUID]
+
+    @field_validator("voter_name")
+    @classmethod
+    def name_stripped(cls, v: str) -> str:
+        return v.strip()
+
+
+class SurveyResultItemOut(BaseModel):
+    product_id: uuid.UUID
+    product_name: str
+    vote_count: int
+    is_fixed: bool
+
+
+class SurveyResultsOut(BaseModel):
+    results: List[SurveyResultItemOut]
+    total_voters: int
+    survey_ends_at: datetime
+    menu_size: int
+
+
+class SurveyFixedProductAdd(BaseModel):
+    product_id: uuid.UUID
+
+
+class SurveyFinalizeItemIn(BaseModel):
+    product_id: uuid.UUID
+    quantity_available: int = Field(..., ge=1)
+    price: Decimal
+    ice_cream_addon_price: Optional[Decimal] = None
+
+
+class SurveyFinalizePayload(BaseModel):
+    menu_items: List[SurveyFinalizeItemIn]

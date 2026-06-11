@@ -94,6 +94,14 @@ export default function ProductList() {
                   {p.description && (
                     <span className="text-caramel-500 text-xs mr-2 truncate block">{p.description}</span>
                   )}
+                  <div className="flex gap-3 mt-0.5">
+                    {p.default_price != null && (
+                      <span className="text-caramel-400 text-xs">₪{p.default_price.toFixed(2)}</span>
+                    )}
+                    {p.default_quantity != null && (
+                      <span className="text-caramel-400 text-xs">כמות: {p.default_quantity}</span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex gap-1.5 shrink-0">
@@ -134,6 +142,8 @@ function CreateProductForm({ onDone, onCancel, onError }: CreateProductFormProps
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<IceCreamMode>("none");
+  const [defaultQty, setDefaultQty] = useState("");
+  const [defaultPrice, setDefaultPrice] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -142,7 +152,13 @@ function CreateProductForm({ onDone, onCancel, onError }: CreateProductFormProps
     e.preventDefault();
     setLoading(true);
     try {
-      let p = await adminCreateProduct({ name, description: description || undefined, ice_cream_mode: mode });
+      let p = await adminCreateProduct({
+        name,
+        description: description || undefined,
+        ice_cream_mode: mode,
+        default_quantity: defaultQty ? parseInt(defaultQty) : null,
+        default_price: defaultPrice ? parseFloat(defaultPrice) : null,
+      });
       if (imageFile) p = await adminUploadProductImage(p.id, imageFile);
       onDone(p);
     } catch (err: unknown) {
@@ -180,6 +196,20 @@ function CreateProductForm({ onDone, onCancel, onError }: CreateProductFormProps
           <option key={m} value={m}>{ICE_CREAM_MODE_LABELS[m]}</option>
         ))}
       </select>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-xs font-semibold text-caramel-500 mb-1">מחיר ברירת מחדל (₪)</label>
+          <input type="number" step="0.01" min="0" placeholder="0.00"
+            value={defaultPrice} onChange={(e) => setDefaultPrice(e.target.value)}
+            className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-caramel-500 mb-1">כמות ברירת מחדל</label>
+          <input type="number" min="1" placeholder="10"
+            value={defaultQty} onChange={(e) => setDefaultQty(e.target.value)}
+            className={inputCls} />
+        </div>
+      </div>
       <div className="flex gap-2 items-center flex-wrap">
         <button type="submit" disabled={loading}
           className="bg-chocolate text-cream px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-chocolate-light transition-colors disabled:opacity-50">
@@ -216,6 +246,8 @@ function EditProductRow({ product, onDone, onCancel, onError }: EditProductRowPr
   const [name, setName] = useState(product.name);
   const [description, setDescription] = useState(product.description ?? "");
   const [mode, setMode] = useState<IceCreamMode>(product.ice_cream_mode);
+  const [defaultQty, setDefaultQty] = useState(product.default_quantity != null ? String(product.default_quantity) : "");
+  const [defaultPrice, setDefaultPrice] = useState(product.default_price != null ? String(product.default_price) : "");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -226,6 +258,8 @@ function EditProductRow({ product, onDone, onCancel, onError }: EditProductRowPr
         name,
         description: description || undefined,
         ice_cream_mode: mode,
+        default_quantity: defaultQty ? parseInt(defaultQty) : null,
+        default_price: defaultPrice ? parseFloat(defaultPrice) : null,
       });
       onDone(updated);
     } catch (err: unknown) {
@@ -271,6 +305,20 @@ function EditProductRow({ product, onDone, onCancel, onError }: EditProductRowPr
           <option key={m} value={m}>{ICE_CREAM_MODE_LABELS[m]}</option>
         ))}
       </select>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-xs font-semibold text-caramel-500 mb-1">מחיר ברירת מחדל (₪)</label>
+          <input type="number" step="0.01" min="0" placeholder="0.00"
+            value={defaultPrice} onChange={(e) => setDefaultPrice(e.target.value)}
+            className={inputCls} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-caramel-500 mb-1">כמות ברירת מחדל</label>
+          <input type="number" min="1" placeholder="10"
+            value={defaultQty} onChange={(e) => setDefaultQty(e.target.value)}
+            className={inputCls} />
+        </div>
+      </div>
       <div className="flex gap-2 items-center flex-wrap">
         <button type="submit"
           className="bg-chocolate text-cream px-4 py-1.5 rounded-xl text-sm font-semibold hover:bg-chocolate-light transition-colors">
