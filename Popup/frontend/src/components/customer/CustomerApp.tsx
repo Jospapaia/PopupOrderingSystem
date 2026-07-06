@@ -6,6 +6,7 @@ import EventPage from "./EventPage";
 export default function CustomerApp() {
   const [event, setEvent]           = useState<UpcomingEvent | null | undefined>(undefined);
   const [networkError, setNetworkError] = useState(false);
+  const [errorDetail, setErrorDetail]   = useState<string>("");
 
   const load = () => {
     setNetworkError(false);
@@ -17,7 +18,10 @@ export default function CustomerApp() {
         }
         setEvent(res.event);
       })
-      .catch(() => setNetworkError(true));
+      .catch((e) => {
+        setErrorDetail((e as Error)?.message || String(e));
+        setNetworkError(true);
+      });
   };
 
   useEffect(() => { load(); }, []);
@@ -31,6 +35,9 @@ export default function CustomerApp() {
           </div>
           <p className="font-display font-bold text-xl text-chocolate mb-2">המערכת לא זמינה</p>
           <p className="text-caramel-500 text-sm mb-6">אנא נסה שוב בעוד מספר רגעים</p>
+          {errorDetail && (
+            <p className="text-[11px] text-caramel-400 mb-4 break-all font-mono" dir="ltr">{errorDetail}</p>
+          )}
           <button
             onClick={load}
             className="bg-chocolate text-cream px-8 py-3 rounded-3xl font-bold shadow-button-lg hover:bg-chocolate-light transition-colors active:scale-95"

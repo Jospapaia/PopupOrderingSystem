@@ -63,7 +63,10 @@ async function request<T>(
   isAdmin = false,
 ): Promise<T> {
   const headers: Record<string, string> = {};
-  if (!(options.body instanceof FormData)) {
+  // Only set Content-Type when there's an actual JSON body. Setting it on
+  // bodyless GETs makes them "non-simple" and forces a CORS preflight (OPTIONS)
+  // that some mobile networks mishandle — keep GETs as simple requests.
+  if (options.body != null && !(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
   Object.assign(headers, options.headers as Record<string, string> | undefined);
@@ -78,10 +81,12 @@ async function request<T>(
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     response = await fetch(`${BASE}${path}`, { ...options, headers, signal: controller.signal });
-  } catch {
-    // Network failure or timeout (abort) — surface as a retryable network error
-    // instead of leaving the caller hanging forever.
-    throw new Error("NETWORK_ERROR");
+  } catch (e) {
+    // Distinguish a timeout (request hung and was aborted) from an immediate
+    // network/CORS failure so the UI can show a meaningful reason.
+    const name = (e as Error)?.name;
+    if (name === "AbortError") throw new Error("TIMEOUT (request hung >15s)");
+    throw new Error(`NETWORK_ERROR (${(e as Error)?.message || name || "failed"})`);
   } finally {
     clearTimeout(timeoutId);
   }
