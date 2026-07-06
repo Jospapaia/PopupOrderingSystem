@@ -9,7 +9,13 @@ import type {
   SurveyFixedProductOut, SurveyStartPayload,
 } from "./types";
 
-export const BASE = import.meta.env.VITE_API_URL ?? "";
+// In production the API is reached through a same-origin Vercel rewrite
+// (/api/* -> Hetzner), so the phone only ever talks to Vercel's edge and
+// never traverses the flaky mobile->origin path directly. In dev we hit the
+// backend directly via VITE_API_URL.
+export const BASE = import.meta.env.PROD
+  ? "/api"
+  : (import.meta.env.VITE_API_URL ?? "");
 
 // Abort a request that hangs (e.g. flaky mobile network) so the UI shows a
 // retry prompt instead of spinning on "loading" indefinitely.
