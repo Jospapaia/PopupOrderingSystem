@@ -30,7 +30,7 @@ backend/
 frontend/
   src/
     api/
-      client.ts       # All API calls; handles 401 → redirect to password gate
+      client.ts       # All API calls; BASE=/api in prod (Vercel proxy), 15s fetch timeout; 401 → password gate
       types.ts        # TypeScript interfaces matching backend schemas
     components/
       customer/       # CustomerApp, EventPage, ItemList, SlotPicker, OrderForm, Confirmation, AboutPage, SurveyPage
@@ -74,7 +74,7 @@ README.md             # Local setup + deployment guide
 ### Ice Cream Mode (3-mode enum on `products`)
 - `none` — no machine time, no slot required (cookies, pecan pie)
 - `included` — always ice cream (standalone scoop, affogato) → slot required, counts 1× per quantity
-- `optional` — customer may add ice cream per portion via a two-step UI: main stepper controls total quantity, a sub-stepper transfers portions between "with ice cream" and "without". Slot + count only for the with-ice-cream portions.
+- `optional` — customer may add ice cream to some or all portions. Slot + count only for the with-ice-cream portions. See **Customer Add-to-Cart Flow** below.
 
 ### CartItem Shape (`types.ts`)
 ```ts
@@ -85,6 +85,14 @@ interface CartItem {
 }
 ```
 `cartItemQuantity = quantityWithIceCream + quantityWithoutIceCream`. Price = `price * total + ice_cream_addon_price * quantityWithIceCream`. Order submission splits one CartItem into two `OrderItemIn` rows when both counts are non-zero.
+
+### Customer Add-to-Cart Flow (`ItemList.tsx`)
+- **Not in cart (all products):** a **quantity stepper + "הוספה להזמנה" button on one row**. Stepping the quantity never touches the cart.
+- **On "הוספה להזמנה":**
+  - `none` / `included` → the chosen quantity goes straight into the cart.
+  - `optional` → opens the **ice cream count dialog** ("כמה מתוך N המנות עם גלידה?"), a stepper capped at the chosen quantity. The dialog holds local state and only writes to the cart on **אישור**.
+- **In cart (`optional`):** total-quantity stepper + a row **"X מתוך Y מנות עם גלידה 🍦 — שינוי ›"** that reopens the dialog. Quantity changes never auto-open the dialog (no more pop-on-every-tap; the old inline sub-stepper and the proceed-time warning were removed).
+- Stepper +/- buttons share the same light style; `Stepper` takes an optional `disableDec`.
 
 ### Slot Capacity (atomic, SELECT FOR UPDATE)
 ```
@@ -149,6 +157,7 @@ The survey is an **optional** step between `draft` and `published`. The full lif
 
 - **Without survey:** `draft → published → completed`
 - **With survey:** `draft → survey → published → completed`
+- **Reopen:** a `completed` event can go back to `published` via `POST /admin/events/{id}/reopen` ("פתח מחדש" button, shown only for completed events). Slots/menu already exist from the original publish, so it simply becomes active again.
 
 #### Activating a survey
 Admin clicks "פתח סקר" on a draft event and configures:
@@ -159,7 +168,7 @@ Admin clicks "פתח סקר" on a draft event and configures:
 Event moves to `survey` status. A share link for voters: `/survey/{event_id}`.
 
 #### Voting (public, no auth)
-`GET /events/{id}/survey` — returns event info + all products excluding fixed ones.
+`GET /events/{id}/survey` — returns event info (incl. `start_time`/`end_time`, shown on `SurveyPage`) + all products excluding fixed ones.
 `POST /events/{id}/vote` — `{ voter_name, browser_token, product_ids[] }`. Voter can choose up to `menu_size` products. Re-voting from the same `browser_token` replaces previous votes. `browser_token` is a UUID stored in `localStorage` per event (soft deduplication, trust-based). `SurveyPage.tsx` marks voted state in `localStorage` so the UI shows a confirmation on return.
 
 #### Finalizing
@@ -198,6 +207,16 @@ cd frontend && npm install && npm run dev
 
 ### Frontend
 Deployed automatically via Vercel on every push to `main`. No manual step needed.
+
+### API routing — Vercel proxy (IMPORTANT)
+The frontend does **not** call the origin (`api.yossiscookies.store`) directly in production. Israeli **mobile** clients hit intermittent TCP packet loss on the direct path to the Hetzner origin (Nuremberg DE) that breaks multi-packet responses (small ones like `/health` always work; desktops are fine). Confirmed via `tcpdump` retransmissions; the origin, CORS, and app were all proven healthy.
+
+Fix: all API + image traffic is proxied through Vercel's edge, which mobile clients reach reliably:
+- `frontend/vercel.json` rewrites `/api/:path*` → `https://api.yossiscookies.store/:path*` (before the SPA catch-all).
+- `frontend/src/api/client.ts`: `BASE = import.meta.env.PROD ? "/api" : (VITE_API_URL ?? "")` — prod is same-origin `/api`; dev hits the backend directly. `client.ts` also has a 15s `AbortController` fetch timeout so a hung request shows a retry screen instead of spinning forever.
+- Origin nginx has gzip enabled for `application/json` (`/etc/nginx/conf.d/10-gzip.conf`).
+
+**If phones "can't load / loading forever" again, it's this path — don't re-debug the transport; verify the `/api` rewrite and `BASE` are intact.** Cloudflare in front of the origin is the alternative path-change fix.
 
 ### Backend
 Backend runs on `root@178.105.141.67` at `/app/Popup`. Deploy with either script:
