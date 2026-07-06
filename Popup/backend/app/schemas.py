@@ -348,6 +348,8 @@ class SurveyPublicOut(BaseModel):
     title: str
     description: Optional[str] = None
     date: _Date
+    start_time: _Time
+    end_time: _Time
     survey_ends_at: datetime
     menu_size: int
     products: List[SurveyProductOut]

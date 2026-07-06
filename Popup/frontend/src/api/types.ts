@@ -115,6 +115,8 @@ export interface SurveyPublicOut {
   title: string;
   description: string | null;
   date: string;
+  start_time: string;
+  end_time: string;
   survey_ends_at: string;
   menu_size: number;
   products: SurveyProduct[];
