@@ -66,7 +66,7 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
     }
   };
 
-  // Pre-add quantity chosen on the card for optional items not yet in the cart.
+  // Pre-add quantity chosen on the card for any product not yet in the cart.
   const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
   const pendingFor = (item: MenuItemPublic) => pendingQty[item.id] ?? 1;
   const setPending = (item: MenuItemPublic, v: number) =>
@@ -85,6 +85,21 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
     });
     setPending(item, 1);
     setIceCreamDialog(null);
+  };
+
+  // "Add to order" — chosen quantity enters the cart. Optional items route
+  // through the ice cream dialog; included/none go straight in.
+  const handleAdd = (item: MenuItemPublic) => {
+    const qty = pendingFor(item);
+    if (item.ice_cream_mode === "optional") {
+      setIceCreamDialog({ item, quantity: qty, initialIce: 0 });
+    } else if (item.ice_cream_mode === "included") {
+      updateCart(item, { quantityWithIceCream: qty });
+      setPending(item, 1);
+    } else {
+      updateCart(item, { quantityWithoutIceCream: qty });
+      setPending(item, 1);
+    }
   };
 
   const total     = cartTotal(cart);
@@ -191,39 +206,25 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
                   /* ── Included ice cream exhausted — can't add ── */
                   <p className="text-center text-sm text-caramel-400 py-1 tracking-wide">אין גלידה זמינה</p>
 
-                ) : isOptional && !inCart ? (
-                  /* ── Optional, not in cart: pick quantity, then add (opens dialog) ── */
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="text-sm text-caramel-500 font-medium">כמות</span>
-                      <Stepper
-                        value={pendingFor(item)}
-                        onDec={() => setPending(item, Math.max(1, pendingFor(item) - 1))}
-                        onInc={() => setPending(item, Math.min(item.remaining_quantity, pendingFor(item) + 1))}
-                        disableInc={pendingFor(item) >= item.remaining_quantity}
-                        large
-                      />
-                    </div>
+                ) : !inCart ? (
+                  /* ── Not in cart: pick quantity + add, same row (all products) ── */
+                  <div className="flex items-center gap-3">
+                    <Stepper
+                      value={pendingFor(item)}
+                      onDec={() => setPending(item, Math.max(1, pendingFor(item) - 1))}
+                      onInc={() => setPending(item, Math.min(item.remaining_quantity, pendingFor(item) + 1))}
+                      disableDec={pendingFor(item) <= 1}
+                      disableInc={pendingFor(item) >= item.remaining_quantity}
+                      large
+                    />
                     <button
-                      onClick={() =>
-                        setIceCreamDialog({ item, quantity: pendingFor(item), initialIce: 0 })
-                      }
-                      className="relative w-full overflow-hidden bg-chocolate text-cream font-semibold py-2.5 rounded-2xl text-base transition-all duration-200 active:scale-[0.97] hover:bg-chocolate-light"
+                      onClick={() => handleAdd(item)}
+                      className="relative flex-1 overflow-hidden bg-chocolate text-cream font-semibold py-2.5 rounded-2xl text-base transition-all duration-200 active:scale-[0.97] hover:bg-chocolate-light"
                     >
                       <span className="relative z-10">הוספה להזמנה</span>
                       <span className="absolute inset-0 bg-gradient-to-l from-transparent via-white/10 to-transparent animate-shimmer" />
                     </button>
                   </div>
-
-                ) : !inCart ? (
-                  /* ── Non-optional add button ── */
-                  <button
-                    onClick={() => incSimple(item)}
-                    className="relative w-full overflow-hidden bg-chocolate text-cream font-semibold py-2.5 rounded-2xl text-base transition-all duration-200 active:scale-[0.97] hover:bg-chocolate-light"
-                  >
-                    <span className="relative z-10">הוספה להזמנה</span>
-                    <span className="absolute inset-0 bg-gradient-to-l from-transparent via-white/10 to-transparent animate-shimmer" />
-                  </button>
 
                 ) : isIncluded && iceCreamExhausted ? (
                   /* ── Included ice cream exhausted — in cart already, disable stepper ── */
@@ -331,12 +332,13 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
 }
 
 function Stepper({
-  value, onDec, onInc, disableInc, large = false,
+  value, onDec, onInc, disableInc, disableDec, large = false,
 }: {
   value: number;
   onDec: () => void;
   onInc: () => void;
   disableInc: boolean;
+  disableDec?: boolean;
   large?: boolean;
 }) {
   const btnCls = large
@@ -345,7 +347,7 @@ function Stepper({
 
   return (
     <div className="flex items-center gap-2 shrink-0">
-      <button onClick={onDec} disabled={value === 0}
+      <button onClick={onDec} disabled={disableDec ?? value === 0}
         className={`${btnCls} bg-caramel-100 hover:bg-caramel-200 disabled:opacity-40 text-chocolate`}>
         −
       </button>
