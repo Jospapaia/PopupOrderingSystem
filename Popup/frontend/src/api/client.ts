@@ -11,6 +11,10 @@ import type {
 
 export const BASE = import.meta.env.VITE_API_URL ?? "";
 
+// Abort a request that hangs (e.g. flaky mobile network) so the UI shows a
+// retry prompt instead of spinning on "loading" indefinitely.
+const REQUEST_TIMEOUT_MS = 15000;
+
 let adminPassword: string | null = null;
 let onUnauthorized: (() => void) | null = null;
 
@@ -70,10 +74,16 @@ async function request<T>(
   }
 
   let response: Response;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    response = await fetch(`${BASE}${path}`, { ...options, headers });
+    response = await fetch(`${BASE}${path}`, { ...options, headers, signal: controller.signal });
   } catch {
+    // Network failure or timeout (abort) — surface as a retryable network error
+    // instead of leaving the caller hanging forever.
     throw new Error("NETWORK_ERROR");
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (response.status === 401 && isAdmin) {
