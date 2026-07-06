@@ -148,6 +148,9 @@ export const adminPublishEvent = (id: string): Promise<EventOut> =>
 export const adminCompleteEvent = (id: string): Promise<EventOut> =>
   request<EventOut>(`/admin/events/${id}/complete`, { method: "POST" }, true);
 
+export const adminReopenEvent = (id: string): Promise<EventOut> =>
+  request<EventOut>(`/admin/events/${id}/reopen`, { method: "POST" }, true);
+
 export const adminCancelEvent = (id: string): Promise<EventOut> =>
   request<EventOut>(`/admin/events/${id}/cancel`, { method: "POST" }, true);
 

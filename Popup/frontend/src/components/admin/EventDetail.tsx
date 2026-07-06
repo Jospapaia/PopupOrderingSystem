@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, type FormEvent } from "react";
 import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut, SlotAdminOut, SurveyResultsOut, SurveyFixedProductOut } from "../../api/types";
 // IceCreamMode is still needed for AddMenuItemPanel's newProduct state
 import {
-  adminPublishEvent, adminCompleteEvent, adminCancelEvent, adminDeleteEvent,
+  adminPublishEvent, adminCompleteEvent, adminReopenEvent, adminCancelEvent, adminDeleteEvent,
   adminListMenuItems, adminAddMenuItem, adminUpdateMenuItem, adminDeleteMenuItem,
   adminReorderMenuItems, adminListProducts, adminCreateProduct, adminUpdateEvent, adminListOrders,
   adminPickupOrder, adminCancelOrder, adminDeleteOrder, adminRemoveOrderItem, adminUpdateOrderItem,
@@ -140,6 +140,9 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
 
   const handleComplete = () =>
     doAction(() => adminCompleteEvent(event.id), "לסגור את האירוע? לא יתקבלו הזמנות חדשות.");
+
+  const handleReopen = () =>
+    doAction(() => adminReopenEvent(event.id), "לפתוח מחדש את האירוע? הוא יחזור להיות פעיל ויתקבלו הזמנות חדשות.");
 
   const handleCancel = () =>
     doAction(() => adminCancelEvent(event.id), "לבטל את האירוע? הזמנות קיימות לא יבוטלו.");
@@ -427,6 +430,12 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                   בטל אירוע
                 </button>
               </>
+            )}
+            {event.status === "completed" && (
+              <button onClick={handleReopen}
+                className="bg-pistachio text-white px-3 py-1.5 rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity">
+                פתח מחדש
+              </button>
             )}
             {/* Delete available for all statuses */}
             <button onClick={handleDelete}

@@ -367,6 +367,19 @@ def complete_event(event_id: uuid.UUID, db: Session = Depends(get_db)) -> EventO
     return event
 
 
+@router.post("/events/{event_id}/reopen", response_model=EventOut)
+def reopen_event(event_id: uuid.UUID, db: Session = Depends(get_db)) -> EventOut:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="האירוע לא נמצא")
+    if event.status != EventStatus.completed:
+        raise HTTPException(status_code=409, detail="ניתן לפתוח מחדש רק אירועים שהסתיימו")
+    event.status = EventStatus.published
+    db.commit()
+    db.refresh(event)
+    return event
+
+
 @router.post("/events/{event_id}/cancel", response_model=EventOut)
 def cancel_event(event_id: uuid.UUID, db: Session = Depends(get_db)) -> EventOut:
     event = db.get(Event, event_id)
