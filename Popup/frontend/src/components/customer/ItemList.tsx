@@ -33,44 +33,19 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
     else onChange([...cart, updated]);
   };
 
-  // Total stepper: adds/removes a unit (without ice cream by default)
+  // In-cart total stepper for optional items: adds a without-ice-cream portion,
+  // or removes a portion (without-ice-cream first, so ice cream portions survive).
   const incTotal = (item: MenuItemPublic) => {
     const ci = getCartItem(item);
     updateCart(item, { quantityWithoutIceCream: ci.quantityWithoutIceCream + 1 });
-    if (iceCreamTotalRemaining !== 0) setIceCreamDialogItemId(item.id);
   };
   const decTotal = (item: MenuItemPublic) => {
     const ci = getCartItem(item);
-    // Remove a without-ice-cream portion first, keeping ice cream portions intact...
     if (ci.quantityWithoutIceCream > 0) {
       updateCart(item, { quantityWithoutIceCream: ci.quantityWithoutIceCream - 1 });
     } else if (ci.quantityWithIceCream > 0) {
       updateCart(item, { quantityWithIceCream: ci.quantityWithIceCream - 1 });
-    } else {
-      return;
     }
-    // ...then, if any portion remains, re-ask the split so the customer confirms
-    // how many of the remaining portions keep ice cream (resolves the ambiguity).
-    const remaining = cartItemQuantity(ci) - 1;
-    if (remaining > 0 && iceCreamTotalRemaining !== 0) {
-      setIceCreamDialogItemId(item.id);
-    }
-  };
-
-  // Ice cream sub-stepper: transfers between without ↔ with
-  const incIceCream = (item: MenuItemPublic) => {
-    const ci = getCartItem(item);
-    updateCart(item, {
-      quantityWithIceCream: ci.quantityWithIceCream + 1,
-      quantityWithoutIceCream: ci.quantityWithoutIceCream - 1,
-    });
-  };
-  const decIceCream = (item: MenuItemPublic) => {
-    const ci = getCartItem(item);
-    updateCart(item, {
-      quantityWithIceCream: ci.quantityWithIceCream - 1,
-      quantityWithoutIceCream: ci.quantityWithoutIceCream + 1,
-    });
   };
 
   // Non-optional single stepper
@@ -91,7 +66,26 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
     }
   };
 
-  const [iceCreamDialogItemId, setIceCreamDialogItemId] = useState<string | null>(null);
+  // Pre-add quantity chosen on the card for optional items not yet in the cart.
+  const [pendingQty, setPendingQty] = useState<Record<string, number>>({});
+  const pendingFor = (item: MenuItemPublic) => pendingQty[item.id] ?? 1;
+  const setPending = (item: MenuItemPublic, v: number) =>
+    setPendingQty((prev) => ({ ...prev, [item.id]: v }));
+
+  // Ice cream count dialog: opens on "add to order" (and on edit) for optional items.
+  const [iceCreamDialog, setIceCreamDialog] =
+    useState<{ item: MenuItemPublic; quantity: number; initialIce: number } | null>(null);
+
+  const confirmIceCream = (iceCount: number) => {
+    if (!iceCreamDialog) return;
+    const { item, quantity } = iceCreamDialog;
+    updateCart(item, {
+      quantityWithIceCream: iceCount,
+      quantityWithoutIceCream: quantity - iceCount,
+    });
+    setPending(item, 1);
+    setIceCreamDialog(null);
+  };
 
   const total     = cartTotal(cart);
   const hasItems  = cart.some((ci) => cartItemQuantity(ci) > 0);
@@ -197,17 +191,34 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
                   /* ── Included ice cream exhausted — can't add ── */
                   <p className="text-center text-sm text-caramel-400 py-1 tracking-wide">אין גלידה זמינה</p>
 
-                ) : !inCart ? (
-                  /* ── Add button ── */
-                  <button
-                    onClick={() => {
-                      if (isOptional) {
-                        updateCart(item, { quantityWithoutIceCream: 1 });
-                        if (iceCreamTotalRemaining !== 0) setIceCreamDialogItemId(item.id);
-                      } else {
-                        incSimple(item);
+                ) : isOptional && !inCart ? (
+                  /* ── Optional, not in cart: pick quantity, then add (opens dialog) ── */
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="text-sm text-caramel-500 font-medium">כמות</span>
+                      <Stepper
+                        value={pendingFor(item)}
+                        onDec={() => setPending(item, Math.max(1, pendingFor(item) - 1))}
+                        onInc={() => setPending(item, Math.min(item.remaining_quantity, pendingFor(item) + 1))}
+                        disableInc={pendingFor(item) >= item.remaining_quantity}
+                        large
+                      />
+                    </div>
+                    <button
+                      onClick={() =>
+                        setIceCreamDialog({ item, quantity: pendingFor(item), initialIce: 0 })
                       }
-                    }}
+                      className="relative w-full overflow-hidden bg-chocolate text-cream font-semibold py-2.5 rounded-2xl text-base transition-all duration-200 active:scale-[0.97] hover:bg-chocolate-light"
+                    >
+                      <span className="relative z-10">הוספה להזמנה</span>
+                      <span className="absolute inset-0 bg-gradient-to-l from-transparent via-white/10 to-transparent animate-shimmer" />
+                    </button>
+                  </div>
+
+                ) : !inCart ? (
+                  /* ── Non-optional add button ── */
+                  <button
+                    onClick={() => incSimple(item)}
                     className="relative w-full overflow-hidden bg-chocolate text-cream font-semibold py-2.5 rounded-2xl text-base transition-all duration-200 active:scale-[0.97] hover:bg-chocolate-light"
                   >
                     <span className="relative z-10">הוספה להזמנה</span>
@@ -244,7 +255,9 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
                     </div>
                     {/* Ice cream summary — tap to change count */}
                     <button
-                      onClick={() => setIceCreamDialogItemId(item.id)}
+                      onClick={() =>
+                        setIceCreamDialog({ item, quantity: totalQty, initialIce: ci.quantityWithIceCream })
+                      }
                       className="w-full flex items-center justify-between bg-caramel-50 rounded-2xl px-3 py-2 text-right transition-colors hover:bg-caramel-100"
                     >
                       <span className="text-sm font-medium text-chocolate">
@@ -278,57 +291,16 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
       </div>
 
       {/* ── Ice cream count dialog ── */}
-      {iceCreamDialogItemId && (() => {
-        const item = menuItems.find((m) => m.id === iceCreamDialogItemId);
-        if (!item) return null;
-        const ci = getCartItem(item);
-        const totalQty = cartItemQuantity(ci);
-        const iceCreamExhausted = iceCreamTotalRemaining === 0;
-        return (
-          <div
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
-            onClick={() => setIceCreamDialogItemId(null)}
-          >
-            <div
-              className="bg-white rounded-3xl shadow-xl p-6 max-w-xs w-full text-center space-y-4"
-              dir="rtl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-4xl">🍦</div>
-              <h3 className="font-display font-bold text-chocolate text-lg">{item.product_name}</h3>
-              <p className="text-caramel-600 text-sm leading-relaxed">
-                כמה מנות עם גלידה?
-                {item.ice_cream_addon_price ? (
-                  <span className="block text-caramel-500 text-xs mt-1">
-                    תוספת ₪{item.ice_cream_addon_price.toFixed(0)} למנה
-                  </span>
-                ) : null}
-              </p>
-              <div className="flex items-center justify-between bg-caramel-50 rounded-2xl px-4 py-3">
-                <span className="text-sm font-medium text-chocolate">עם גלידה 🍦</span>
-                <Stepper
-                  value={ci.quantityWithIceCream}
-                  onDec={() => decIceCream(item)}
-                  onInc={() => incIceCream(item)}
-                  disableInc={ci.quantityWithoutIceCream === 0 || iceCreamExhausted}
-                />
-              </div>
-              <p className="text-xs text-caramel-400">
-                {ci.quantityWithIceCream} מתוך {totalQty} מנות עם גלידה
-              </p>
-              {iceCreamExhausted && ci.quantityWithIceCream === 0 && (
-                <p className="text-xs text-orange-500">אין גלידה זמינה</p>
-              )}
-              <button
-                onClick={() => setIceCreamDialogItemId(null)}
-                className="w-full py-2.5 rounded-2xl bg-chocolate text-cream font-semibold text-sm hover:bg-chocolate-light transition-colors"
-              >
-                אישור
-              </button>
-            </div>
-          </div>
-        );
-      })()}
+      {iceCreamDialog && (
+        <IceCreamDialog
+          item={iceCreamDialog.item}
+          quantity={iceCreamDialog.quantity}
+          initialIce={iceCreamDialog.initialIce}
+          iceCreamExhausted={iceCreamTotalRemaining === 0}
+          onConfirm={confirmIceCream}
+          onClose={() => setIceCreamDialog(null)}
+        />
+      )}
 
       {/* ── Fixed bottom bar ── */}
       {hasItems && (
@@ -384,6 +356,63 @@ function Stepper({
         className={`${btnCls} bg-chocolate hover:bg-chocolate-light disabled:bg-caramel-200 text-cream`}>
         +
       </button>
+    </div>
+  );
+}
+
+function IceCreamDialog({
+  item, quantity, initialIce, iceCreamExhausted, onConfirm, onClose,
+}: {
+  item: MenuItemPublic;
+  quantity: number;
+  initialIce: number;
+  iceCreamExhausted: boolean;
+  onConfirm: (iceCount: number) => void;
+  onClose: () => void;
+}) {
+  const [iceCount, setIceCount] = useState(
+    iceCreamExhausted ? 0 : Math.min(initialIce, quantity)
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-xl p-6 max-w-xs w-full text-center space-y-4"
+        dir="rtl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-4xl">🍦</div>
+        <h3 className="font-display font-bold text-chocolate text-lg">{item.product_name}</h3>
+        <p className="text-caramel-600 text-sm leading-relaxed">
+          כמה מתוך {quantity} המנות עם גלידה?
+          {item.ice_cream_addon_price ? (
+            <span className="block text-caramel-500 text-xs mt-1">
+              תוספת ₪{item.ice_cream_addon_price.toFixed(0)} למנה
+            </span>
+          ) : null}
+        </p>
+        <div className="flex items-center justify-between bg-caramel-50 rounded-2xl px-4 py-3">
+          <span className="text-sm font-medium text-chocolate">עם גלידה 🍦</span>
+          <Stepper
+            value={iceCount}
+            onDec={() => setIceCount((n) => Math.max(0, n - 1))}
+            onInc={() => setIceCount((n) => Math.min(quantity, n + 1))}
+            disableInc={iceCount >= quantity || iceCreamExhausted}
+          />
+        </div>
+        {iceCreamExhausted && (
+          <p className="text-xs text-orange-500">אין גלידה זמינה</p>
+        )}
+        <button
+          onClick={() => onConfirm(iceCount)}
+          className="w-full py-2.5 rounded-2xl bg-chocolate text-cream font-semibold text-sm hover:bg-chocolate-light transition-colors"
+        >
+          אישור
+        </button>
+      </div>
     </div>
   );
 }
