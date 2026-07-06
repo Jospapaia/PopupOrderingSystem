@@ -262,9 +262,7 @@ export default function ItemList({ menuItems, cart, onChange, onNext, baseUrl, i
                       className="w-full flex items-center justify-between bg-caramel-50 rounded-2xl px-3 py-2 text-right transition-colors hover:bg-caramel-100"
                     >
                       <span className="text-sm font-medium text-chocolate">
-                        {ci.quantityWithIceCream > 0
-                          ? `${ci.quantityWithIceCream} עם גלידה 🍦`
-                          : "הוספת גלידה 🍦"}
+                        {`${ci.quantityWithIceCream} מתוך ${totalQty} מנות עם גלידה 🍦`}
                         {item.ice_cream_addon_price ? (
                           <span className="text-caramel-500 font-normal"> +₪{item.ice_cream_addon_price.toFixed(0)}</span>
                         ) : null}
@@ -355,7 +353,7 @@ function Stepper({
         {value}
       </span>
       <button onClick={onInc} disabled={disableInc}
-        className={`${btnCls} bg-chocolate hover:bg-chocolate-light disabled:bg-caramel-200 text-cream`}>
+        className={`${btnCls} bg-caramel-100 hover:bg-caramel-200 disabled:opacity-40 text-chocolate`}>
         +
       </button>
     </div>
