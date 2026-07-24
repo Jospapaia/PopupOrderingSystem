@@ -9,7 +9,7 @@ from typing import List, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -131,6 +131,61 @@ def _generate_slot_objects(
 
 def _requires_lock_check(update_data: dict) -> bool:
     return bool(_LOCKED_FIELDS.intersection(update_data.keys()))
+
+
+def _reconcile_slots_for_end_time(db: Session, event: Event, new_end: time) -> None:
+    """Adjust slots when a published event's end_time changes.
+
+    Extending appends new slots for the added range; shortening deletes the
+    trailing slots, but only if none of them hold non-cancelled orders.
+    Reads the *current* event.end_time as the old boundary, so it must run
+    before the new end_time is written to the event.
+    """
+    old_end = event.end_time
+    if new_end == old_end:
+        return
+
+    start_dt = datetime.combine(event.date, event.start_time, tzinfo=BUSINESS_TZ)
+    new_end_dt = datetime.combine(event.date, new_end, tzinfo=BUSINESS_TZ)
+    duration = timedelta(minutes=event.slot_duration_min)
+    total_minutes = int((new_end_dt - start_dt).total_seconds() / 60)
+    if total_minutes <= 0 or total_minutes % event.slot_duration_min != 0:
+        raise HTTPException(
+            status_code=409,
+            detail="טווח הזמן אינו מתחלק בשווה — שנה את שעת הסיום כך שתתאים למשך הסלוט",
+        )
+
+    if new_end > old_end:
+        old_end_dt = datetime.combine(event.date, old_end, tzinfo=BUSINESS_TZ)
+        current = old_end_dt
+        while current < new_end_dt:
+            db.add(Slot(event_id=event.id, slot_start=current, slot_end=current + duration))
+            current += duration
+    else:
+        doomed = db.execute(
+            select(Slot).where(Slot.event_id == event.id, Slot.slot_start >= new_end_dt)
+        ).scalars().all()
+        if doomed:
+            doomed_ids = [s.id for s in doomed]
+            order_count = db.execute(
+                select(func.count(Order.id)).where(
+                    Order.slot_id.in_(doomed_ids),
+                    Order.status != OrderStatus.cancelled,
+                )
+            ).scalar_one()
+            if order_count:
+                raise HTTPException(
+                    status_code=409,
+                    detail="לא ניתן לקצר את האירוע — יש הזמנות בסלוטים שיוסרו",
+                )
+            # Only cancelled orders may still point at these slots (active ones
+            # were rejected above). Detach them so the slot FK doesn't block the
+            # delete — cancelled orders keep their slot_id otherwise.
+            db.execute(
+                update(Order).where(Order.slot_id.in_(doomed_ids)).values(slot_id=None)
+            )
+            for slot in doomed:
+                db.delete(slot)
 
 
 # ── About Page ────────────────────────────────────────────────────────────────
@@ -282,20 +337,25 @@ def update_event(event_id: uuid.UUID, payload: EventUpdate, db: Session = Depend
         raise HTTPException(status_code=404, detail="האירוע לא נמצא")
 
     update_data = payload.model_dump(exclude_unset=True)
-    if _requires_lock_check(update_data):
-        if event.status != EventStatus.draft:
+    locked_changing = _LOCKED_FIELDS.intersection(update_data.keys())
+    if locked_changing:
+        if event.status == EventStatus.draft:
+            has_orders = db.execute(
+                select(func.count(Order.id))
+                .where(Order.event_id == event_id, Order.status != OrderStatus.cancelled)
+            ).scalar_one()
+            if has_orders:
+                raise HTTPException(
+                    status_code=409,
+                    detail="לא ניתן לשנות תאריך/שעות/משך סלוט לאחר קבלת הזמנות",
+                )
+        elif locked_changing == {"end_time"} and event.status == EventStatus.published:
+            # end_time is editable on a live event; reconcile slots to the new boundary
+            _reconcile_slots_for_end_time(db, event, update_data["end_time"])
+        else:
             raise HTTPException(
                 status_code=409,
-                detail="לא ניתן לשנות תאריך/שעות/משך סלוט לאחר פרסום האירוע",
-            )
-        has_orders = db.execute(
-            select(func.count(Order.id))
-            .where(Order.event_id == event_id, Order.status != OrderStatus.cancelled)
-        ).scalar_one()
-        if has_orders:
-            raise HTTPException(
-                status_code=409,
-                detail="לא ניתן לשנות תאריך/שעות/משך סלוט לאחר קבלת הזמנות",
+                detail="לא ניתן לשנות תאריך/שעת התחלה/משך סלוט לאחר פרסום האירוע",
             )
 
     for field, value in update_data.items():

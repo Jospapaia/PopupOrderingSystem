@@ -173,8 +173,11 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       if (event.status === "draft") {
         if (editForm.date !== undefined) payload.date = editForm.date;
         if (editForm.start_time !== undefined) payload.start_time = editForm.start_time;
-        if (editForm.end_time !== undefined) payload.end_time = editForm.end_time;
         if (editForm.slot_duration_min !== undefined) payload.slot_duration_min = editForm.slot_duration_min;
+      }
+      // end_time is editable on draft and live (published) events
+      if ((event.status === "draft" || event.status === "published") && editForm.end_time !== undefined) {
+        payload.end_time = editForm.end_time;
       }
       console.log("[handleEditSave] payload=", payload, "event.id=", event.id);
       const updated = await adminUpdateEvent(event.id, payload);
@@ -182,6 +185,9 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       setEvent(updated);
       setIsEditing(false);
       setHighlightPublishError(false);
+      // end_time changes on a live event add/remove slots — refresh slot views
+      loadSlots();
+      setSlotRefreshKey((k) => k + 1);
     } catch (err: unknown) {
       const apiErr = toApiError(err);
       console.error("[handleEditSave] error=", apiErr);
@@ -475,24 +481,41 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
               </div>
               {!lockedFields && (
                 <>
-                  <input type="date" value={editForm.date ?? ""}
-                    onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                    className={inputCls} />
-                  <input type="time" value={editForm.start_time ?? ""}
-                    onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
-                    className={highlightPublishError ? inputErrorCls : inputCls} />
+                  <div>
+                    <label className="block text-xs font-semibold text-caramel-500 mb-1">תאריך</label>
+                    <input type="date" value={editForm.date ?? ""}
+                      onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                      className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-caramel-500 mb-1">שעת התחלה</label>
+                    <input type="time" value={editForm.start_time ?? ""}
+                      onChange={(e) => setEditForm({ ...editForm, start_time: e.target.value })}
+                      className={highlightPublishError ? inputErrorCls : inputCls} />
+                  </div>
+                </>
+              )}
+              {/* End time: editable on draft AND live (published) events */}
+              {(event.status === "draft" || event.status === "published") && (
+                <div className={lockedFields ? "col-span-2" : ""}>
+                  <label className="block text-xs font-semibold text-caramel-500 mb-1">שעת סיום</label>
                   <input type="time" value={editForm.end_time ?? ""}
                     onChange={(e) => setEditForm({ ...editForm, end_time: e.target.value })}
                     className={highlightPublishError ? inputErrorCls : inputCls} />
+                </div>
+              )}
+              {!lockedFields && (
+                <div>
+                  <label className="block text-xs font-semibold text-caramel-500 mb-1">משך סלוט (דקות)</label>
                   <input type="number" min="1" value={editForm.slot_duration_min ?? ""} placeholder="משך סלוט (דקות)"
                     onChange={(e) => { const v = e.target.valueAsNumber; if (!isNaN(v)) setEditForm({ ...editForm, slot_duration_min: v }); }}
                     className={highlightPublishError ? inputErrorCls : inputCls} />
-                </>
+                </div>
               )}
             </div>
             {lockedFields && (
               <p className="text-amber-700 text-xs bg-amber-50 border border-amber-100 p-2 rounded-xl">
-                תאריך, שעות ומשך הסלוט נעולים לאחר פרסום האירוע
+                תאריך, שעת ההתחלה ומשך הסלוט נעולים לאחר פרסום — ניתן לעדכן את שעת הסיום (סלוטים ייווצרו או יוסרו בהתאם)
               </p>
             )}
             <div className="flex gap-2">

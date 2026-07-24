@@ -104,8 +104,8 @@ effective_max = slot.max_ice_cream ?? event.max_ice_cream_per_slot
 ### Capacity Enforcement
 - `POST /orders`: SELECT FOR UPDATE on slot + each event_menu_item in one transaction
 - `PATCH /admin/slots/{id}`: blocks `max_ice_cream` < current booked with 409 + `current_booked`
-- `PATCH /admin/events/{id}`: blocks `date/start_time/end_time/slot_duration_min` when `status != draft` (UI guard hides those fields; backend is authoritative)
-- Frontend hides date/time/slot_duration inputs when `event.status !== "draft"`
+- `PATCH /admin/events/{id}`: blocks `date/start_time/slot_duration_min` when `status != draft`. **`end_time` is the exception — editable on a live (`published`) event** to extend/shorten a running popup. Changing it reconciles slots via `_reconcile_slots_for_end_time`: extending appends slots for the new range; shortening deletes trailing slots (409 if any hold a non-cancelled order; cancelled orders on those slots are detached to `slot_id = NULL` first since the FK has no `ondelete`). Non-aligned `end_time` (range not divisible by `slot_duration_min`) → 409. (UI guard hides locked fields; backend is authoritative.)
+- Frontend hides date/start_time/slot_duration inputs when `event.status !== "draft"`, but shows the **שעת סיום** input when `draft` **or** `published`. `handleEditSave` sends `end_time` for both, and refreshes slots (`loadSlots()` + `slotRefreshKey`) after save.
 
 ### Slot Generation
 Generated on `POST /admin/events/{id}/publish` (draft → published). Algorithm:
