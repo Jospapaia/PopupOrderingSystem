@@ -788,7 +788,16 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                 <p className="text-center text-caramel-400 text-sm py-8">אין הזמנות עדיין</p>
               )}
               {[...allOrders]
-                .sort((a, b) => a.created_at.localeCompare(b.created_at))
+                .sort((a, b) => {
+                  // Sort by pickup (slot) time; orders without a slot go last.
+                  const sa = a.slot_id ? slotMap.get(a.slot_id)?.slot_start ?? null : null;
+                  const sb = b.slot_id ? slotMap.get(b.slot_id)?.slot_start ?? null : null;
+                  if (sa === null && sb === null) return a.created_at.localeCompare(b.created_at);
+                  if (sa === null) return 1;
+                  if (sb === null) return -1;
+                  const cmp = sa.localeCompare(sb);
+                  return cmp !== 0 ? cmp : a.created_at.localeCompare(b.created_at);
+                })
                 .map((order, idx) => {
                   const isEditing = editingOrderId === order.id;
                   const canEdit = order.status !== "picked_up";
@@ -807,7 +816,13 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                           <span className={`text-xs px-1.5 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
                             {ORDER_STATUS_LABELS[order.status]}
                           </span>
-                          <span className="text-xs text-caramel-400">{formatTime(order.created_at)}</span>
+                          {order.slot_id ? (
+                            <span className="text-xs font-medium text-chocolate">
+                              🕐 איסוף {formatTime(slotMap.get(order.slot_id)?.slot_start ?? "")}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-caramel-400">ללא שעת איסוף</span>
+                          )}
                         </div>
                         {canEdit && !isEditing && (
                           <div className="flex gap-1 shrink-0">
