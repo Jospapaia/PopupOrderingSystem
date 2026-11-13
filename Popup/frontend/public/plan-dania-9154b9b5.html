@@ -115,6 +115,11 @@
   ul ul li::before { background: var(--accent); width: 8px; height: 8px; }
   strong.key { color: var(--accent-strong); font-size: 1.1em; }
 
+  h3.table-title { font-family: var(--font-body); font-weight: 600; font-size: 1.05rem; color: var(--fg); margin: 26px 0 0; text-wrap: balance; }
+  td .sub { display: block; font-size: 0.85em; color: var(--muted); white-space: normal; font-weight: 400; }
+  .note-box { margin-top: 22px; padding: 16px 20px; border-radius: 10px; background: var(--surface-2); border-inline-start: 4px solid var(--gold); font-size: 0.97rem; }
+  .note-box strong:last-child { color: var(--accent-strong); }
+
   /* Intro with founder photo */
   .intro { display: grid; grid-template-columns: 1fr; gap: 26px; align-items: center; }
   .intro > div { min-width: 0; }
@@ -132,7 +137,7 @@
 
   /* Table */
   .table-scroll { overflow-x: auto; margin-top: 18px; border-radius: 10px; border: 1px solid var(--line); }
-  table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+  table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
   th, td { padding: 14px 16px; text-align: right; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { background: var(--band); color: var(--band-fg); font-weight: 500; font-size: 0.88rem; white-space: nowrap; }
   tr:last-child td { border-bottom: 0; }
@@ -196,11 +201,13 @@
   <h2>סטטוס נכס, תשתיות והשקעת הקמה</h2>
   <p>החנות ממוקמת בחלק הפנימי של כיכר דניה (לשעבר חנות בגדים). הנכס כולל תשתיות מים, כיור, שירותים, מערכת אבטחה וחיבור חשמל תלת-פאזי.</p>
   <ul>
-    <li><strong>עלויות קבועות (Fixed Facility OpEx):</strong> כ-8,070 ש"ח לחודש (6,000 ש"ח שכירות, 870 ש"ח דמי ניהול, 1,200 ש"ח ארנונה).</li>
-    <li><strong>השקעה ראשונית כוללת (CapEx):</strong> מוערכת בכ-<strong class="key">80,000 ש"ח</strong> ומחולקת לשני מרכיבים מרכזיים:
+    <li><strong>עלויות נכס קבועות:</strong> 8,070 ש"ח לחודש (6,000 ש"ח שכירות, 870 ש"ח דמי ניהול, 1,200 ש"ח ארנונה) — סה"כ 96,840 ש"ח בשנה.</li>
+    <li><strong>השקעה ראשונית כוללת (CapEx + הון חוזר):</strong> מוערכת בטווח ריאלי של <strong class="key">120,000–150,000 ש"ח</strong> להקמה מלאה ("מפתח ביד") ברמת גימור גבוהה ונעימה:
       <ul>
-        <li><strong>ציוד אפייה ומטבח (38,000 ש"ח):</strong> תנור 4 מגשים, מיקסר תעשייתי, קירור, שולחנות נירוסטה וכלי עבודה.</li>
-        <li><strong>שיפוץ, התאמות ונראות החלל (42,000 ש"ח):</strong> ריצוף PVC/אפוקסי תקני, חיפויי קירות רחיצים, התאמות אינסטלציה ומפריד שומנים (24,000 ש"ח), עיצוב תאורה חמה, נגרות אחסון ופינת אירוח מזמינה לסדנאות (13,000 ש"ח), ומרווח ביטחון לבלתי צפוי (5,000 ש"ח).</li>
+        <li><strong>ציוד אפייה ומטבח (38,000–45,000 ש"ח):</strong> תנור 4 מגשים, מיקסר תעשייתי, קירור והקפאה, שולחנות נירוסטה וכלי עבודה.</li>
+        <li><strong>שיפוץ ותשתיות אלקטרו-מכניות (40,000–52,000 ש"ח):</strong> ריצוף PVC/אפוקסי תקני, חיפויי קירות רחיצים, אינסטלציה ומפריד שומנים, שדרוג לוח חשמל, מיזוג אוויר ומערכת נידוף.</li>
+        <li><strong>עיצוב, נגרות ונראות החלל (15,000–20,000 ש"ח):</strong> תאורה חמה ומקצועית, נגרות אחסון סגורה, פינת קפה ואירוח מזמינה לסדנאות ומיתוג פנים.</li>
+        <li><strong>רישוי עסקים והון חוזר ראשוני (27,000–33,000 ש"ח):</strong> יועץ רישוי ואדריכלות לתברואה, אגרות, מלאי פתיחה, אריזות ממותגות ושכירות לתקופת השיפוץ.</li>
       </ul>
     </li>
   </ul>
@@ -218,44 +225,87 @@
 </section>
 
 <section>
-  <h2>תחזית פיננסית ותשקיפים (לפי טווחי תמחור)</h2>
-  <p class="tiers">המודל נבחן תחת שלוש רמות תמחור (נמוך: מארז ב-25 ש"ח, עוגה ב-110 ש"ח, סדנה זוגית ב-300 ש"ח, השכרה ב-400 ש"ח | ביניים: 30 / 125 / 375 / 500 ש"ח | גבוה: 35 / 140 / 450 / 600 ש"ח) מול השקעת הקמה כוללת של 80,000 ש"ח:</p>
+  <h2>תחזית פיננסית רב-שנתית (הכנסות מול הוצאות)</h2>
+  <p class="tiers">המודל נבחן תחת שלוש רמות תמחור (נמוך: מארז ב-25 ש"ח, עוגה ב-110 ש"ח, סדנה זוגית ב-300 ש"ח, השכרה ב-400 ש"ח | ביניים: 30 / 125 / 375 / 500 ש"ח | גבוה: 35 / 140 / 450 / 600 ש"ח) מול השקעת הקמה של 120,000–150,000 ש"ח:</p>
 
+  <h3 class="table-title">א. הערכת הוצאות תפעול שנתיות (חומרי גלם + תקורות, רמת תמחור ביניים)</h3>
   <div class="table-scroll">
   <table>
     <thead>
       <tr>
         <th>תרחיש</th>
-        <th>רמת תמחור</th>
-        <th>הכנסה חודשית (שנה 1)</th>
-        <th>רווח נקי חודשי (שנה 1)</th>
-        <th>החזר השקעה (80,000 ₪)</th>
+        <th>הוצאה חודשית (שנה 1)</th>
+        <th>סה"כ הוצאות שנה 1</th>
+        <th>סה"כ הוצאות שנה 2</th>
+        <th>סה"כ הוצאות שנה 3</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td>1. תחביב מנוהל (ללא עובדים)</td>
-        <td>נמוך / ביניים / גבוה</td>
-        <td class="num">25,026 ₪ - 34,247 ₪</td>
-        <td class="num profit">8,164 ₪ - 17,384 ₪</td>
-        <td class="num">4.6 - 9.8 חודשים</td>
+        <td class="num">16,863 ₪ <span class="sub">(6,793 חומרים + 10,070 תפעול)</span></td>
+        <td class="num">202,354 ₪</td>
+        <td class="num">212,329 ₪</td>
+        <td class="num">223,062 ₪</td>
       </tr>
       <tr>
         <td>2. מיקסום כעבודה שנייה (עובד חלקי)</td>
-        <td>נמוך / ביניים / גבוה</td>
-        <td class="num">44,053 ₪ - 60,094 ₪</td>
-        <td class="num profit">14,164 ₪ - 29,504 ₪</td>
-        <td class="num">2.7 - 5.6 חודשים</td>
+        <td class="num">30,240 ₪ <span class="sub">(12,866 חומרים + 17,374 תפעול)</span></td>
+        <td class="num">362,880 ₪</td>
+        <td class="num">393,834 ₪</td>
+        <td class="num">428,765 ₪</td>
       </tr>
       <tr>
         <td>3. All-In (פול-טיים + B2B)</td>
-        <td>נמוך / ביניים / גבוה</td>
-        <td class="num">89,566 ₪ - 121,954 ₪</td>
-        <td class="num profit">24,679 ₪ - 55,547 ₪</td>
-        <td class="num">1.4 - 3.2 חודשים</td>
+        <td class="num">65,647 ₪ <span class="sub">(30,518 חומרים + 35,129 תפעול)</span></td>
+        <td class="num">787,768 ₪</td>
+        <td class="num">879,754 ₪</td>
+        <td class="num">988,576 ₪</td>
       </tr>
     </tbody>
   </table>
+  </div>
+
+  <h3 class="table-title">ב. תחזית הכנסות, רווח נקי והחזר השקעה (120,000–150,000 ₪)</h3>
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>תרחיש</th>
+        <th>הכנסה חודשית (שנה 1)</th>
+        <th>רווח נקי חודשי (שנה 1)</th>
+        <th>רווח שנתי (שנה 1 ← 2 ← 3, רמת ביניים)</th>
+        <th>החזר השקעה (רמת ביניים / טווח מלא)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1. תחביב מנוהל</td>
+        <td class="num">25,026 ₪ - 34,247 ₪</td>
+        <td class="num profit">8,164 ₪ - 17,384 ₪</td>
+        <td class="num">153,289 ₪ ← 173,118 ₪ ← 195,170 ₪</td>
+        <td class="num">9.4 - 11.7 חודשים <span class="sub">(טווח מלא: 6.9 - 18.4)</span></td>
+      </tr>
+      <tr>
+        <td>2. מיקסום כעבודה שנייה</td>
+        <td class="num">44,053 ₪ - 60,094 ₪</td>
+        <td class="num profit">14,164 ₪ - 29,504 ₪</td>
+        <td class="num">262,006 ₪ ← 320,464 ₪ ← 388,358 ₪</td>
+        <td class="num">5.5 - 6.9 חודשים <span class="sub">(טווח מלא: 4.1 - 10.6)</span></td>
+      </tr>
+      <tr>
+        <td>3. All-In (פול-טיים)</td>
+        <td class="num">89,566 ₪ - 121,954 ₪</td>
+        <td class="num profit">24,679 ₪ - 55,547 ₪</td>
+        <td class="num">481,355 ₪ ← 643,194 ₪ ← 838,961 ₪</td>
+        <td class="num">3.0 - 3.7 חודשים <span class="sub">(טווח מלא: 2.2 - 6.1)</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note-box">
+    <strong>הנחות ביקוש ועקומת הבשלה (Ramp-up):</strong> תחזית הבסיס מניחה תפוקה שבועית מלאה (80 מארזים, 12 עוגות, 12 חלות, סדנה אחת ו-2 השכרות מטבח בשבוע) כבר מהחודש הראשון. במבחן שמרני הלוקח בחשבון עקומת הבשלה הדרגתית בשנה הראשונה (50% ביקוש במחצית הראשונה ו-75% במחצית השנייה), העסק עדיין שומר על איזון חיובי מהחודש הראשון (רווח של כ-1,350 ₪ בחודש ב-50% תפוקה), מסיים את שנה 1 ברווח נקי של כ-50,491 ₪, ומחזיר השקעת הקמה של 120,000–150,000 ₪ תוך כ-<strong>17–19 חודשים</strong>.
   </div>
 </section>
 
@@ -264,11 +314,11 @@
   <div class="scenario-grid">
     <div class="scenario-card">
       <h3>1. תחביב מנוהל</h3>
-      <p>ייצור מרוכז בסופי שבוע. כיסוי מלא של הוצאות הנכס והחזר מלא של ההשקעה בציוד ובשיפוץ תוך פחות מ-10 חודשים, תוך שמירה על משרת הפיתוח.</p>
+      <p>ייצור מרוכז בסופי שבוע. כיסוי מלא של הוצאות הנכס והחזר מלא של ההשקעה בציוד, בשיפוץ וברישוי תוך כ-9.5–12 חודשים בתפוקה מלאה (או כ-17–19 חודשים בתרחיש הבשלה הדרגתי), תוך שמירה על משרת הפיתוח.</p>
     </div>
     <div class="scenario-card">
       <h3>2. מיקסום כעבודה שנייה</h3>
-      <p>שילוב עובד אריזה והרחבת ערוצי ההפצה (כולל Wolt). הגדלת נפח הפעילות בסדנאות והשכירות והחזר השקעה תוך כ-3.7 חודשים ברמת ביניים.</p>
+      <p>שילוב עובד אריזה והרחבת ערוצי ההפצה (כולל Wolt). הגדלת נפח הפעילות בסדנאות והשכירות והחזר השקעה תוך כ-5.5–7 חודשים ברמת ביניים.</p>
     </div>
     <div class="scenario-card">
       <h3>3. All-In (פול-טיים)</h3>
