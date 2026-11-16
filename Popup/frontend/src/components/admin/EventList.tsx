@@ -119,19 +119,19 @@ export default function EventList() {
       <div className="space-y-3">
         {events.map((ev) => (
           <div key={ev.id}
-            className="bg-white border border-caramel-100 rounded-2xl shadow-card p-4 flex items-center justify-between hover:shadow-card-hover transition-shadow">
-            <div>
+            className="bg-white border border-caramel-100 rounded-2xl shadow-card p-4 flex items-center justify-between gap-3 hover:shadow-card-hover transition-shadow">
+            <div className="min-w-0">
               <div className="font-semibold text-chocolate">{ev.title}</div>
               <div className="text-sm text-caramel-500 mt-0.5">
                 {formatDate(ev.date)} · {formatTimeRange(ev.start_time, ev.end_time)}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[ev.status]}`}>
                 {STATUS_LABELS[ev.status]}
               </span>
               <button onClick={() => setSelected(ev)}
-                className="text-sm font-semibold text-caramel-600 hover:text-chocolate transition-colors">
+                className="text-sm font-semibold text-caramel-600 hover:text-chocolate transition-colors whitespace-nowrap">
                 נהל ›
               </button>
             </div>
