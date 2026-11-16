@@ -145,6 +145,10 @@ Singleton table `about_page` (id=1, migration 0004). Fields: `bio_text` (Text, n
 ### Price Snapshot
 `unit_price` stored at order creation = `event_menu_items.price + ice_cream_addon_price` (if with_ice_cream=true). Never recalculated.
 
+### Editing Menu Prices (any status, incl. live events)
+`PATCH /admin/menu-items/{id}` accepts `price` / `ice_cream_addon_price` at **any event status** — including `published` — with no status guard. Both must be `>= 0` (422 otherwise). Because of the price snapshot above, a change applies to **new orders only**; existing orders keep their `unit_price` and totals. The addon can be changed but not cleared (the PATCH ignores `null` fields).
+- UI (`EventDetail` menu tab): click the price ("₪X ✎") on a menu row to open an inline editor (price, plus "תוספת גלידה" for `optional` products). On non-draft events it shows a note that only new orders get the new price.
+
 ### Admin Orders Tab
 `EventDetail` has three tabs: **תפריט**, **סלוטים**, **הזמנות**.
 - **הזמנות** tab has two sub-views toggled by buttons:

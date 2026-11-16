@@ -169,9 +169,11 @@ class EventMenuItemCreate(BaseModel):
 
 
 class EventMenuItemUpdate(BaseModel):
+    # Allowed at any event status, including published: orders snapshot
+    # unit_price at creation, so a price change only affects new orders.
     quantity_available: Optional[int] = None
-    price: Optional[Decimal] = None
-    ice_cream_addon_price: Optional[Decimal] = None
+    price: Optional[Decimal] = Field(default=None, ge=0)
+    ice_cream_addon_price: Optional[Decimal] = Field(default=None, ge=0)
     is_active: Optional[bool] = None
 
 

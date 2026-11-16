@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, type FormEvent } from "react";
-import type { EventOut, EventMenuItemOut, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut, SlotAdminOut, SurveyResultsOut, SurveyFixedProductOut } from "../../api/types";
+import type { EventOut, EventMenuItemOut, MenuItemUpdatePayload, ProductOut, EventUpdatePayload, IceCreamMode, OrderOut, SlotAdminOut, SurveyResultsOut, SurveyFixedProductOut } from "../../api/types";
 // IceCreamMode is still needed for AddMenuItemPanel's newProduct state
 import {
   adminPublishEvent, adminCompleteEvent, adminReopenEvent, adminCancelEvent, adminDeleteEvent,
@@ -51,6 +51,9 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [highlightPublishError, setHighlightPublishError] = useState(false);
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
   const [editingQtyValue, setEditingQtyValue] = useState("");
+  const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
+  const [editingPriceValue, setEditingPriceValue] = useState("");
+  const [editingAddonValue, setEditingAddonValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [dragSrcIdx, setDragSrcIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
@@ -222,6 +225,31 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
     try {
       await adminUpdateMenuItem(itemId, { quantity_available: parsed });
       setEditingQtyId(null);
+      loadMenu();
+    } catch (err: unknown) {
+      setError(toApiError(err).message);
+    }
+  };
+
+  const startEditingPrice = (item: EventMenuItemOut) => {
+    setEditingPriceId(item.id);
+    setEditingPriceValue(String(item.price));
+    setEditingAddonValue(item.ice_cream_addon_price !== null ? String(item.ice_cream_addon_price) : "");
+  };
+
+  // Price changes apply to new orders only — existing orders keep their unit_price snapshot.
+  const handleSavePrice = async (item: EventMenuItemOut) => {
+    const price = parseFloat(editingPriceValue);
+    if (isNaN(price) || price < 0) return;
+    const payload: MenuItemUpdatePayload = { price };
+    if (item.ice_cream_mode === "optional" && editingAddonValue.trim() !== "") {
+      const addon = parseFloat(editingAddonValue);
+      if (isNaN(addon) || addon < 0) return;
+      payload.ice_cream_addon_price = addon;
+    }
+    try {
+      await adminUpdateMenuItem(item.id, payload);
+      setEditingPriceId(null);
       loadMenu();
     } catch (err: unknown) {
       setError(toApiError(err).message);
@@ -663,9 +691,18 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                     </span>
                     <div>
                       <span className="font-semibold text-chocolate">{item.product_name}</span>
-                      <span className="text-caramel-500 mr-2">₪{item.price.toFixed(2)}</span>
-                      {item.ice_cream_addon_price !== null && (
-                        <span className="text-caramel-400 text-xs">+₪{item.ice_cream_addon_price.toFixed(2)} גלידה</span>
+                      {editingPriceId !== item.id && (
+                        <button
+                          onClick={() => startEditingPrice(item)}
+                          title="עריכת מחיר"
+                          className="mr-2 text-caramel-500 hover:text-chocolate transition-colors"
+                        >
+                          ₪{item.price.toFixed(2)}
+                          {item.ice_cream_addon_price !== null && (
+                            <span className="text-caramel-400 text-xs mr-1">+₪{item.ice_cream_addon_price.toFixed(2)} גלידה</span>
+                          )}
+                          <span className="text-xs mr-1">✎</span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -684,6 +721,52 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                     </button>
                   </div>
                 </div>
+
+                {/* Price edit row — allowed on published events too; existing orders keep their price */}
+                {editingPriceId === item.id && (
+                  <div className="mt-2 pr-7 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="flex items-center gap-1 text-xs text-caramel-500">
+                        מחיר ₪
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={editingPriceValue}
+                          onChange={(e) => setEditingPriceValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") void handleSavePrice(item); if (e.key === "Escape") setEditingPriceId(null); }}
+                          autoFocus
+                          className="w-20 bg-white border-2 border-caramel-200 focus:border-caramel-500 rounded-xl px-2 py-1 text-sm text-chocolate outline-none transition-colors"
+                        />
+                      </label>
+                      {item.ice_cream_mode === "optional" && (
+                        <label className="flex items-center gap-1 text-xs text-caramel-500">
+                          תוספת גלידה ₪
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={editingAddonValue}
+                            onChange={(e) => setEditingAddonValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") void handleSavePrice(item); if (e.key === "Escape") setEditingPriceId(null); }}
+                            className="w-20 bg-white border-2 border-caramel-200 focus:border-caramel-500 rounded-xl px-2 py-1 text-sm text-chocolate outline-none transition-colors"
+                          />
+                        </label>
+                      )}
+                      <button onClick={() => void handleSavePrice(item)}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-chocolate text-cream font-medium hover:bg-chocolate-light transition-colors">
+                        שמור
+                      </button>
+                      <button onClick={() => setEditingPriceId(null)}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-parchment border border-caramel-200 text-chocolate font-medium hover:bg-caramel-100 transition-colors">
+                        ביטול
+                      </button>
+                    </div>
+                    {event.status !== "draft" && (
+                      <p className="text-xs text-caramel-400">המחיר החדש יחול על הזמנות חדשות בלבד — הזמנות קיימות שומרות על המחיר המקורי</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Quantity row */}
                 <div className="mt-2 flex items-center gap-2 pr-7">
