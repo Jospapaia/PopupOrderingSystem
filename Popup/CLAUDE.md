@@ -151,7 +151,8 @@ Singleton table `about_page` (id=1, migration 0004). Fields: `bio_text` (Text, n
 
 ### Admin Orders Tab
 `EventDetail` has three tabs: **תפריט**, **סלוטים**, **הזמנות**.
-- **הזמנות** tab has two sub-views toggled by buttons:
+- **הזמנות** tab opens with a **סיכום הכנסות** card (client-side from `allOrders`, `quantity × unit_price`, cancelled excluded): total, נאסף (picked_up) vs ממתין (confirmed), and an expandable per-product breakdown.
+- It then has two sub-views toggled by buttons:
   - **לפי הזמנה** — sequential numbered list with a sort toggle: **לפי שעת איסוף** (default; slot time, slotless last, ties by `created_at`) or **לפי זמן הזמנה** (`created_at` ascending). Each card shows "הוזמן <date time>". Confirmed orders show "עריכה" (inline qty/remove edit) and "מחק" (hard delete).
   - **לפי מוצר** — per-menu-item remaining/available badge + buyer list aggregated from non-cancelled orders.
 

@@ -97,6 +97,29 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
 
   const slotMap = useMemo(() => new Map(slots.map((s) => [s.id, s])), [slots]);
 
+  // Revenue summary from unit_price snapshots; cancelled orders excluded.
+  const revenue = useMemo(() => {
+    let total = 0, collected = 0, count = 0, pickedUpCount = 0;
+    const byProduct = new Map<string, { qty: number; amount: number }>();
+    for (const o of allOrders) {
+      if (o.status === "cancelled") continue;
+      count++;
+      if (o.status === "picked_up") pickedUpCount++;
+      for (const oi of o.items) {
+        const amount = oi.quantity * oi.unit_price;
+        total += amount;
+        if (o.status === "picked_up") collected += amount;
+        const p = byProduct.get(oi.product_name) ?? { qty: 0, amount: 0 };
+        p.qty += oi.quantity;
+        p.amount += amount;
+        byProduct.set(oi.product_name, p);
+      }
+    }
+    const products = [...byProduct.entries()].sort((a, b) => b[1].amount - a[1].amount);
+    return { total, collected, pending: total - collected, count, pickedUpCount, products };
+  }, [allOrders]);
+  const [showRevenueDetails, setShowRevenueDetails] = useState(false);
+
   const startEditing = () => {
     setEditForm({
       title: event.title,
@@ -870,6 +893,37 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
       {/* Orders tab */}
       {tab === "orders" && (
         <div>
+          {/* Revenue summary */}
+          {revenue.count > 0 && (
+            <div className="bg-white border border-caramel-100 rounded-2xl shadow-card p-4 mb-4 text-sm">
+              <div className="flex justify-between items-baseline">
+                <span className="font-semibold text-chocolate">סיכום הכנסות</span>
+                <span className="text-xs text-caramel-400">{revenue.count} הזמנות</span>
+              </div>
+              <div className="text-2xl font-bold text-chocolate mt-1 tabular-nums">₪{revenue.total.toFixed(2)}</div>
+              <div className="flex gap-4 mt-1 text-xs">
+                <span className="text-green-700">נאסף: ₪{revenue.collected.toFixed(2)} ({revenue.pickedUpCount})</span>
+                <span className="text-amber-700">ממתין: ₪{revenue.pending.toFixed(2)} ({revenue.count - revenue.pickedUpCount})</span>
+              </div>
+              <button
+                onClick={() => setShowRevenueDetails((v) => !v)}
+                className="text-xs font-medium text-caramel-500 hover:text-chocolate transition-colors mt-2"
+              >
+                {showRevenueDetails ? "הסתר פירוט ‹" : "פירוט לפי מוצר ›"}
+              </button>
+              {showRevenueDetails && (
+                <div className="border-t border-caramel-100 mt-2 pt-2 space-y-1">
+                  {revenue.products.map(([name, p]) => (
+                    <div key={name} className="flex justify-between text-xs">
+                      <span className="text-chocolate">{name} ×{p.qty}</span>
+                      <span className="tabular-nums text-chocolate">₪{p.amount.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* View toggle */}
           <div className="flex gap-2 mb-4">
             <button
