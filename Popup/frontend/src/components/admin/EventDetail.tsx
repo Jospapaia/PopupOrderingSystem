@@ -262,6 +262,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
     try {
       await adminPickupOrder(orderId);
       loadOrders();
+      setSlotRefreshKey((k) => k + 1);
     } catch (err: unknown) {
       setError(toApiError(err).message);
     }
@@ -953,6 +954,14 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                         </div>
                         {canEdit && !isEditing && (
                           <div className="flex gap-1 shrink-0">
+                            {order.status === "confirmed" && (
+                              <button
+                                onClick={() => void handlePickupSlotless(order.id)}
+                                className="text-xs bg-caramel-500 text-white px-2 py-1 rounded-lg font-medium hover:bg-caramel-600 transition-colors"
+                              >
+                                נאסף ✓
+                              </button>
+                            )}
                             <button
                               onClick={() => startEditOrder(order)}
                               className="text-xs bg-parchment border border-caramel-200 text-chocolate px-2 py-1 rounded-lg font-medium hover:bg-caramel-100 transition-colors"
