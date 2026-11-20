@@ -12,7 +12,7 @@ import {
 } from "../../api/client";
 import SlotGrid from "./SlotGrid";
 import { STATUS_LABELS, STATUS_COLORS, ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, ICE_CREAM_MODES, ICE_CREAM_MODE_LABELS } from "../../utils/eventStatus";
-import { formatDate, formatTimeRange, formatTime } from "../../utils/format";
+import { formatDate, formatTimeRange, formatTime, formatDateTimeShort } from "../../utils/format";
 
 interface Props {
   event: EventOut;
@@ -48,6 +48,7 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
   const [slotlessOrders, setSlotlessOrders] = useState<OrderOut[]>([]);
   const [allOrders, setAllOrders] = useState<OrderOut[]>([]);
   const [ordersView, setOrdersView] = useState<"by-order" | "by-product">("by-order");
+  const [orderSort, setOrderSort] = useState<"slot" | "created">("slot");
   const [highlightPublishError, setHighlightPublishError] = useState(false);
   const [editingQtyId, setEditingQtyId] = useState<string | null>(null);
   const [editingQtyValue, setEditingQtyValue] = useState("");
@@ -893,8 +894,25 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
               {allOrders.length === 0 && (
                 <p className="text-center text-caramel-400 text-sm py-8">אין הזמנות עדיין</p>
               )}
+              {allOrders.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-caramel-500">
+                  <span>מיון:</span>
+                  {([["slot", "לפי שעת איסוף"], ["created", "לפי זמן הזמנה"]] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setOrderSort(key)}
+                      className={`px-2.5 py-1 rounded-lg font-medium transition-colors ${
+                        orderSort === key ? "bg-chocolate text-cream" : "bg-white border border-caramel-200 text-chocolate hover:bg-caramel-50"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {[...allOrders]
                 .sort((a, b) => {
+                  if (orderSort === "created") return a.created_at.localeCompare(b.created_at);
                   // Sort by pickup (slot) time; orders without a slot go last.
                   const sa = a.slot_id ? slotMap.get(a.slot_id)?.slot_start ?? null : null;
                   const sb = b.slot_id ? slotMap.get(b.slot_id)?.slot_start ?? null : null;
@@ -929,6 +947,9 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                           ) : (
                             <span className="text-xs text-caramel-400">ללא שעת איסוף</span>
                           )}
+                          <span className="text-xs text-caramel-400">
+                            · הוזמן {formatDateTimeShort(order.created_at)}
+                          </span>
                         </div>
                         {canEdit && !isEditing && (
                           <div className="flex gap-1 shrink-0">

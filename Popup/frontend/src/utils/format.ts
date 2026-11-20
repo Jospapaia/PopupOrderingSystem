@@ -5,6 +5,13 @@ export function formatTime(iso: string): string {
   return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: BUSINESS_TZ });
 }
 
+export function formatDateTimeShort(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("he-IL", {
+    day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: BUSINESS_TZ,
+  });
+}
+
 export function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("he-IL", { timeZone: BUSINESS_TZ });
 }
