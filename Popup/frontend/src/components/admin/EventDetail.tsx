@@ -1082,12 +1082,21 @@ export default function EventDetail({ event: initialEvent, onBack, onAction }: P
                       {!isEditing && (
                         <div className="mt-2 space-y-0.5 pr-8">
                           {order.items.map((oi) => (
-                            <div key={oi.id} className="text-caramel-700">
-                              {oi.product_name} ×{oi.quantity}
-                              {oi.with_ice_cream === true && <span className="text-caramel-400 text-xs"> (עם גלידה)</span>}
-                              {oi.with_ice_cream === false && <span className="text-caramel-400 text-xs"> (ללא גלידה)</span>}
+                            <div key={oi.id} className="text-caramel-700 flex justify-between gap-2">
+                              <span>
+                                {oi.product_name} ×{oi.quantity}
+                                {oi.with_ice_cream === true && <span className="text-caramel-400 text-xs"> (עם גלידה)</span>}
+                                {oi.with_ice_cream === false && <span className="text-caramel-400 text-xs"> (ללא גלידה)</span>}
+                              </span>
+                              <span className="text-xs text-caramel-400 tabular-nums shrink-0">₪{(oi.quantity * oi.unit_price).toFixed(2)}</span>
                             </div>
                           ))}
+                          <div className="flex justify-between border-t border-caramel-100 pt-1 mt-1 font-semibold text-chocolate">
+                            <span>סה״כ</span>
+                            <span className="tabular-nums">
+                              ₪{order.items.reduce((sum, oi) => sum + oi.quantity * oi.unit_price, 0).toFixed(2)}
+                            </span>
+                          </div>
                           {order.notes && <p className="text-xs text-amber-600 mt-1">הערה: {order.notes}</p>}
                         </div>
                       )}
